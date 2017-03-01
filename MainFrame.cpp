@@ -1,0 +1,185 @@
+#include "MainFrame.h"
+#include <occview.h>
+#include "OCCWindow.h"
+#include <wx/notebook.h>
+#include <wx/listctrl.h>
+#include <wx/combobox.h>
+#include <StlAPI.hxx>
+#include <STEPControl_Writer.hxx>
+// ----------------------------------------------------------------------------
+// constants
+// ----------------------------------------------------------------------------
+
+// IDs for the controls and the menu commands
+enum
+{
+	// menu items
+	FTS_Quit = wxID_EXIT,
+	FTS_ModeNotebook = wxID_HIGHEST + 1,
+	FTS_ExportCrude = wxID_HIGHEST + 2,
+	FTS_Open = wxID_OPEN,
+	// it is important for the id corresponding to the "About" command to have
+	// this standard value as otherwise it won't be handled properly under Mac
+	// (where it is special and put into the "Apple" menu)
+	FTS_About = wxID_ABOUT
+};
+
+// ----------------------------------------------------------------------------
+// event tables and other macros for wxWidgets
+// ----------------------------------------------------------------------------
+
+// the event tables connect the wxWidgets events with the functions (event
+// handlers) which process them. It can be also done at run-time, but for the
+// simple menu events like this the static method is much simpler.
+wxBEGIN_EVENT_TABLE(MyFrame, wxFrame)
+EVT_MENU(FTS_Quit, MyFrame::OnQuit)
+EVT_MENU(FTS_About, MyFrame::OnAbout)
+EVT_MENU(FTS_Open,MyFrame::OnOpen)
+EVT_BUTTON(FTS_ExportCrude, MyFrame::OnCrudeExport)
+wxEND_EVENT_TABLE()
+
+// ----------------------------------------------------------------------------
+// main frame
+// ----------------------------------------------------------------------------
+
+// frame constructor
+MyFrame::MyFrame(const wxString& title)
+	: wxFrame(NULL, wxID_ANY, title, wxDefaultPosition, wxSize(1200, 1024))
+{
+	// set the frame icon
+	SetIcon(wxICON(sample));
+
+#if wxUSE_MENUS
+	// create a menu bar
+	wxMenu *fileMenu = new wxMenu;
+
+	// the "About" item should be in the help menu
+	wxMenu *helpMenu = new wxMenu;
+	helpMenu->Append(FTS_About, "&About\tF1", "Show about dialog");
+
+	fileMenu->Append(FTS_Open, "&Open\tCtrl-O", "Open a file");
+	fileMenu->Append(FTS_Quit, "E&xit\tAlt-X", "Quit this program");
+
+	// now append the freshly created menu to the menu bar...
+	wxMenuBar *menuBar = new wxMenuBar();
+	menuBar->Append(fileMenu, "&File");
+	menuBar->Append(helpMenu, "&Help");
+
+	// ... and attach this menu bar to the frame
+	SetMenuBar(menuBar);
+#else // !wxUSE_MENUS
+	// If menus are not available add a button to access the about box
+	wxSizer* sizer = new wxBoxSizer(wxHORIZONTAL);
+	wxButton* aboutBtn = new wxButton(this, wxID_ANY, "About...");
+	aboutBtn->Bind(wxEVT_BUTTON, &MyFrame::OnAbout, this);
+	sizer->Add(aboutBtn, wxSizerFlags().Center());
+#endif // wxUSE_MENUS/!wxUSE_MENUS
+
+#if wxUSE_STATUSBAR
+	// create a status bar just for fun (by default with 1 pane only)
+	CreateStatusBar(2);
+	SetStatusText("Welcome to wxWidgets!");
+#endif // wxUSE_STATUSBAR
+}
+
+
+// event handlers
+
+void MyFrame::OnQuit(wxCommandEvent& WXUNUSED(event))
+{
+	// true is to force the frame to close
+	Close(true);
+}
+
+void MyFrame::OnAbout(wxCommandEvent& WXUNUSED(event))
+{
+	wxMessageBox(wxString::Format
+		(
+			"Welcome to %s!\n"
+			"\n"
+			"This is the minimal wxWidgets sample\n"
+			"running under %s.",
+			wxVERSION_STRING,
+			wxGetOsDescription()
+			),
+		"About wxWidgets minimal sample",
+		wxOK | wxICON_INFORMATION,
+		this);
+}
+
+void MyFrame::OnCrudeExport(wxCommandEvent& event)
+{
+	wxFileDialog* SaveDialog = new wxFileDialog(
+		this, _("Enter file name to save exported STEP file"), wxEmptyString, wxEmptyString, _("STEP files (*.step)|*.STEP"), wxFD_SAVE, wxDefaultPosition);
+	if (SaveDialog->ShowModal() == wxID_OK)
+	{
+		STEPControl_Writer writer;
+		writer.Transfer(occView->GetCurrentShape(), STEPControl_AsIs);
+		writer.Write(SaveDialog->GetPath());
+	}
+}
+
+void MyFrame::OnOpen(wxCommandEvent& event)
+{
+	wxFileDialog* OpenDialog = new wxFileDialog(
+		this, _("Choose a file to open"), wxEmptyString, wxEmptyString, _("STL files (*.stl)|*.STL"), wxFD_OPEN, wxDefaultPosition);
+	if (OpenDialog->ShowModal() == wxID_OK)
+	{
+		TopoDS_Shape facetFile;
+		StlAPI::Read(facetFile, OpenDialog->GetPath());
+		occView->drawShape(facetFile);
+	}
+}
+
+void MyFrame::Init()
+{
+	auto myNotebook = new wxNotebook(this, FTS_ModeNotebook, wxDefaultPosition, wxSize(300, 500));
+	auto featureExtPage = new wxPanel(myNotebook, -1);
+	
+	auto featureExtSizer = new wxBoxSizer(wxVERTICAL);
+	auto methodSelSizer = new wxBoxSizer(wxHORIZONTAL);
+	wxArrayString str;
+	str.Add("first value");
+	str.Add("second value");
+	auto extMethodList = new wxChoice(featureExtPage, wxID_ANY,wxDefaultPosition,wxDefaultSize,str);
+	methodSelSizer->Add(extMethodList, 1, wxALIGN_TOP, 2);
+	auto extFeaturesButton = new wxButton(featureExtPage, wxID_ANY, "Extract Features");
+	methodSelSizer->Add(extFeaturesButton, 0, wxALIGN_TOP, 0);
+	
+	auto featureSelSizer = new wxBoxSizer(wxVERTICAL);
+	auto featureSel = new wxListBox(featureExtPage,wxID_ANY);
+	featureSelSizer->Add(featureSel, 1, wxEXPAND|wxALIGN_TOP, 0);
+
+	auto featureSelButtonsSizer = new wxBoxSizer(wxHORIZONTAL);
+	auto addFeatureButton = new wxButton(featureExtPage, wxID_ANY, "Add Feature");
+	auto editFeatureButton = new wxButton(featureExtPage, wxID_ANY, "Edit Feature");
+	auto removeFeatureButton = new wxButton(featureExtPage, wxID_ANY, "Remove Feature");
+	featureSelButtonsSizer->Add(addFeatureButton, 1, wxEXPAND);
+	featureSelButtonsSizer->Add(editFeatureButton, 1, wxEXPAND);
+	featureSelButtonsSizer->Add(removeFeatureButton, 1, wxEXPAND);
+
+	featureExtSizer->Add(methodSelSizer);
+	featureExtSizer->Add(featureSelSizer);
+	featureExtSizer->Add(featureSelButtonsSizer);
+	featureExtPage->SetSizer(featureExtSizer);
+	
+	myNotebook->AddPage(featureExtPage, L"Feature Extraction");
+	auto surfFitPage = new wxPanel(myNotebook, -1);
+	myNotebook->AddPage(surfFitPage, L"Surface Fitting");
+	auto exportPage = new wxPanel(myNotebook, -1);
+	auto cloneButton = new wxButton(exportPage, FTS_ExportCrude, "Export Crude Conversion");
+	myNotebook->AddPage(exportPage, L"Export");
+
+	occWindow = new OCCWindow(this);
+	occView = new OCCView(occWindow);
+	occWindow->occview = occView;
+
+	wxBoxSizer *sizer = new wxBoxSizer(wxHORIZONTAL);
+	sizer->Add(myNotebook, 0, wxEXPAND, 0);
+	sizer->Add(occWindow, 1, wxEXPAND, 0);
+	this->SetSizer(sizer);
+
+	// and show it (the frames, unlike simple controls, are not shown when
+	// created initially)
+	this->Show(true);
+}
