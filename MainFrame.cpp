@@ -6,6 +6,7 @@
 #include <wx/combobox.h>
 #include <StlAPI.hxx>
 #include <STEPControl_Writer.hxx>
+#include "FeatureExtraction.h"
 // ----------------------------------------------------------------------------
 // constants
 // ----------------------------------------------------------------------------
@@ -18,6 +19,7 @@ enum
 	FTS_ModeNotebook = wxID_HIGHEST + 1,
 	FTS_ExportCrude = wxID_HIGHEST + 2,
 	FTS_Open = wxID_OPEN,
+	FTS_ExtractFeatures = wxID_HIGHEST + 3,
 	// it is important for the id corresponding to the "About" command to have
 	// this standard value as otherwise it won't be handled properly under Mac
 	// (where it is special and put into the "Apple" menu)
@@ -34,8 +36,9 @@ enum
 wxBEGIN_EVENT_TABLE(MyFrame, wxFrame)
 EVT_MENU(FTS_Quit, MyFrame::OnQuit)
 EVT_MENU(FTS_About, MyFrame::OnAbout)
-EVT_MENU(FTS_Open,MyFrame::OnOpen)
+EVT_MENU(FTS_Open, MyFrame::OnOpen)
 EVT_BUTTON(FTS_ExportCrude, MyFrame::OnCrudeExport)
+EVT_BUTTON(FTS_ExtractFeatures, MyFrame::OnExtractFeatures)
 wxEND_EVENT_TABLE()
 
 // ----------------------------------------------------------------------------
@@ -139,11 +142,11 @@ void MyFrame::Init()
 	auto featureExtSizer = new wxBoxSizer(wxVERTICAL);
 	auto methodSelSizer = new wxBoxSizer(wxHORIZONTAL);
 	wxArrayString str;
-	str.Add("first value");
+	str.Add("Normal Tensor Framework Method");
 	str.Add("second value");
-	auto extMethodList = new wxChoice(featureExtPage, wxID_ANY,wxDefaultPosition,wxDefaultSize,str);
+	extMethodList = new wxChoice(featureExtPage, wxID_ANY,wxDefaultPosition,wxDefaultSize,str);
 	methodSelSizer->Add(extMethodList, 1, wxALIGN_TOP, 2);
-	auto extFeaturesButton = new wxButton(featureExtPage, wxID_ANY, "Extract Features");
+	auto extFeaturesButton = new wxButton(featureExtPage, FTS_ExtractFeatures, "Extract Features");
 	methodSelSizer->Add(extFeaturesButton, 0, wxALIGN_TOP, 0);
 	
 	auto featureSelSizer = new wxBoxSizer(wxVERTICAL);
@@ -182,4 +185,18 @@ void MyFrame::Init()
 	// and show it (the frames, unlike simple controls, are not shown when
 	// created initially)
 	this->Show(true);
+}
+
+void MyFrame::OnExtractFeatures(wxCommandEvent& event)
+{
+	int currentSelection = extMethodList->GetCurrentSelection();
+
+	switch (currentSelection)
+	{
+	case 0: //Normal tensor framework method
+		FeatureExtractionAlgo::NormalTensorFrameworkMethod(occView->GetCurrentShape());
+		break;
+	default:
+		break;
+	}
 }

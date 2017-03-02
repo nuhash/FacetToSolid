@@ -422,12 +422,14 @@
     </Bscmake>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="FeatureExtraction.cpp" />
     <ClCompile Include="FTSApp.cpp" />
     <ClCompile Include="MainFrame.cpp" />
     <ClCompile Include="OCCView.cpp" />
     <ClCompile Include="OCCWindow.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="FeatureExtraction.h" />
     <ClInclude Include="FTSApp.h" />
     <ClInclude Include="MainFrame.h" />
     <ClInclude Include="occview.h" />

@@ -18,9 +18,11 @@ public:
 	void OnCrudeExport(wxCommandEvent& event);
 	void OnOpen(wxCommandEvent& event);
 	void Init();
+	void OnExtractFeatures(wxCommandEvent& event);
 private:
 	// any class wishing to process wxWidgets events must use this macro
 	OCCWindow *occWindow;
 	OCCView* occView;
+	wxChoice* extMethodList;
 	wxDECLARE_EVENT_TABLE();
 };
