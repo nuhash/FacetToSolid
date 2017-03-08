@@ -6,6 +6,16 @@ class FeatureExtractionAlgo
 {
 public:
 	static void NormalTensorFrameworkMethod(TopoDS_Shape model, float creaseAngle = 5.0f);
+
+	class ExtractedFeature
+	{
+	public:
+	protected:
+	private:
+
+	};
+
 protected:
+
 private:
 };
