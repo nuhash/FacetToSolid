@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <Eigen/Eigen>
 #include <Eigen/Core>
+#include <Eigen/Eigenvalues>
 #include <BRep_Tool.hxx>
 #include <BRepTools.hxx>
 #include <TopoDS_Face.hxx>
@@ -36,6 +37,10 @@ void FeatureExtractionAlgo::NormalTensorFrameworkMethod(TopoDS_Shape model, floa
 		//get faces
 
 		//compute normal tensor
+		Matrix3d normalSum;
+		normalSum << 0, 0, 0,
+			0, 0, 0,
+			0, 0, 0;
 		while(!currentFaces.IsEmpty())
 		{
 			TopoDS_Face currentFace = TopoDS::Face(currentFaces.First());
@@ -67,12 +72,26 @@ void FeatureExtractionAlgo::NormalTensorFrameworkMethod(TopoDS_Shape model, floa
 
 			Vector3d crossProduct = e1.cross(e2);
 			
-			double currentWeight = sqrt(crossProduct.dot(crossProduct))/(e1.dot(e1)*e2.dot(e2));
+			double currentWeight = sqrt(crossProduct.dot(crossProduct)) / (e1.dot(e1)*e2.dot(e2));
+
+			normalSum += currentWeight * currentNormal * currentNormal.transpose();
 		}
 
 
 		//compute eigen values, vectors
+
+		EigenSolver<Matrix3d> normalTensorSolver(normalSum, true);
+		auto eigenvectors = normalTensorSolver.eigenvectors();
+		auto eigenValues = normalTensorSolver.eigenvalues();
+
 		//compute vertex classification
+		double creaseParameter = 1 / (tan(0.5*creaseAngle)*tan(0.5*creaseAngle)) - 1;
+		Vector3d vertexClassification(eigenValues.x().real() - eigenValues.y().real(),
+			creaseParameter * (eigenValues.y().real() - eigenValues.z().real()),
+			creaseParameter * eigenValues.z().real());
+		
+		Vector3d::Index vertexClass;
+		vertexClassification.maxCoeff(&vertexClass);
 		//if(feature line)
 		//{
 		//	if(first face)
