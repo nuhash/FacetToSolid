@@ -1,15 +1,15 @@
 #include "FeatureExtraction.h"
 #include <TopExp.hxx>
-#include <TopoDS_Vertex.hxx>
+
 #include <TopoDS.hxx>
 #include <assert.h>
 #include <Eigen/Eigen>
 #include <Eigen/Core>
 #include <Eigen/Eigenvalues>
+
 #include <BRep_Tool.hxx>
 #include <BRepTools.hxx>
-#include <TopoDS_Face.hxx>
-#include <TopoDS_Edge.hxx>
+
 #include <GeomLProp_SLProps.hxx>
 using namespace Eigen;
 //#include 
@@ -17,22 +17,31 @@ void FeatureExtractionAlgo::NormalTensorFrameworkMethod(TopoDS_Shape model, floa
 {
 	TopTools_IndexedDataMapOfShapeListOfShape vertexToFaceMap;
 	TopExp::MapShapesAndAncestors(model, TopAbs_VERTEX, TopAbs_FACE, vertexToFaceMap);
+	TopTools_IndexedDataMapOfShapeListOfShape faceToVertexMap;
+	TopExp::MapShapesAndAncestors(model, TopAbs_FACE, TopAbs_VERTEX, faceToVertexMap);
 	TopTools_IndexedMapOfShape vertices;
 	TopExp::MapShapes(model, TopAbs_VERTEX, vertices);
+	TopTools_IndexedMapOfShape faces;
+	TopExp::MapShapes(model, TopAbs_FACE, faces);
+	int numFaces = faces.Size();
 
 	/******************************************************************************/
 	/*Check to see if duplicate vertices, need to do decide whether to handle case*/
 	/******************************************************************************/
 	TopoDS_Vertex first = TopoDS::Vertex(vertices.FindKey(1));
-	auto faces = vertexToFaceMap.FindFromKey(first);
-	assert(faces.Size() > 1); 
+	//auto faces = vertexToFaceMap.FindFromKey(first);
+	//assert(faces.Size() > 1); 
 	/******************************************************************************/
 	/******************************************************************************/
 	/******************************************************************************/
 	TopoDS_Vertex currentVertex = TopoDS::Vertex(vertices.FindKey(1));
 	auto currentFaces = vertexToFaceMap.FindFromKey(first);
-	while (true) 
+	int numProcessed = 0;
+	ExtractedFeatures features;
+	vector<TopoDS_Vertex> vertexQueue;
+	while (numProcessed<numFaces) 
 	{
+		
 		//get vertex
 		//get faces
 
@@ -41,10 +50,11 @@ void FeatureExtractionAlgo::NormalTensorFrameworkMethod(TopoDS_Shape model, floa
 		normalSum << 0, 0, 0,
 			0, 0, 0,
 			0, 0, 0;
-		while(!currentFaces.IsEmpty())
+		TopTools_ListOfShape tempFaces(currentFaces);
+		while(!tempFaces.IsEmpty())
 		{
-			TopoDS_Face currentFace = TopoDS::Face(currentFaces.First());
-			currentFaces.RemoveFirst();
+			TopoDS_Face currentFace = TopoDS::Face(tempFaces.First());
+			tempFaces.RemoveFirst();
 			
 
 			Standard_Real umin, umax, vmin, vmax;
@@ -92,6 +102,48 @@ void FeatureExtractionAlgo::NormalTensorFrameworkMethod(TopoDS_Shape model, floa
 		
 		Vector3d::Index vertexClass;
 		vertexClassification.maxCoeff(&vertexClass);
+
+		if (vertexClass>0)
+		{
+			if (features.back().NumFaces() == 0)
+			{
+				TopoDS_Face face;
+				for (size_t i = 0; i < currentFaces.Size(); i++)
+				{
+					face = TopoDS::Face(currentFaces.First());
+					currentFaces.RemoveFirst();
+					if (!features.IsFaceProcessed(face))
+						break;
+				}
+				features.back().AddFace(face);
+				features.back().AddVertex(currentVertex);
+			} 
+			else
+			{
+
+			}
+			//features.back().AddVertex(currentVertex);
+		} 
+		else
+		{
+			int n = currentFaces.Size();
+			for (size_t i = 0; i < n; i++)
+			{
+				auto face = TopoDS::Face(currentFaces.First());
+				currentFaces.RemoveFirst();
+				features.back().AddFace(face);
+				features.back().AddVertex(currentVertex);
+
+				auto faceVertices = faceToVertexMap.FindFromKey(face);
+				for (size_t j = 0; j < 3; j++)
+				{
+					auto v = TopoDS::Vertex(faceVertices.First());
+					if (v != currentVertex)
+						vertexQueue.push_back(v);
+					faceVertices.RemoveFirst();
+				}
+			}
+		}
 		//if(feature line)
 		//{
 		//	if(first face)
@@ -113,4 +165,25 @@ void FeatureExtractionAlgo::NormalTensorFrameworkMethod(TopoDS_Shape model, floa
 		//	add faces to feature
 		//}
 	}
+}
+
+bool FeatureExtractionAlgo::ExtractedFeatures::IsFaceProcessed(TopoDS_Face face)
+{
+	for (size_t i = 0; i < this->size(); i++)
+	{
+		auto currentFeature = this->at(i);
+		if(currentFeature.ContainsFace(face))
+			return true;
+	}
+	return false;
+}
+
+bool FeatureExtractionAlgo::ExtractedFeature::ContainsFace(TopoDS_Face face)
+{
+	for (size_t i = 0; i < faces.size(); i++)
+	{
+		if (face == faces[i])
+			return true;
+	}
+	return false;
 }
