@@ -13,7 +13,11 @@ class FeatureExtractionAlgo
 {
 public:
 	static void NormalTensorFrameworkMethod(TopoDS_Shape model, float creaseAngle = 5.0f);
-
+	enum EdgeVertexType
+	{
+		CREASE = 1,
+		CORNER = 2
+	};
 	class ExtractedFeatureEdge
 	{
 	public:
@@ -25,8 +29,9 @@ public:
 	class ExtractedFeature
 	{
 	public:
-		void AddFace(TopoDS_Face face) { faces.push_back(face); }
+		void AddFace(TopoDS_Face face);
 		void AddVertex(TopoDS_Vertex vertex) { vertices.push_back(vertex); }
+		void AddEdgeVertex(TopoDS_Vertex vertex, EdgeVertexType type) { edgeVertices.push_back(vertex); edgeVerticesTypes.push_back(type); }
 		int NumFaces() { return faces.size(); }
 		bool ContainsFace(TopoDS_Face face);
 	protected:
@@ -34,6 +39,7 @@ public:
 		vector<TopoDS_Face> faces;
 		vector<TopoDS_Vertex> vertices;
 		vector<TopoDS_Vertex> edgeVertices;
+		vector<EdgeVertexType> edgeVerticesTypes;
 	};
 
 	class ExtractedFeatures : public vector<ExtractedFeature>
@@ -44,11 +50,7 @@ public:
 	private:
 	};
 
-	enum EdgeVertexType
-	{
-		CREASE,
-		CORNER
-	};
+
 
 
 

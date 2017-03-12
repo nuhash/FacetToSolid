@@ -19,30 +19,44 @@ void FeatureExtractionAlgo::NormalTensorFrameworkMethod(TopoDS_Shape model, floa
 	TopExp::MapShapesAndAncestors(model, TopAbs_VERTEX, TopAbs_FACE, vertexToFaceMap);
 	TopTools_IndexedDataMapOfShapeListOfShape faceToVertexMap;
 	TopExp::MapShapesAndAncestors(model, TopAbs_FACE, TopAbs_VERTEX, faceToVertexMap);
+	TopTools_IndexedDataMapOfShapeListOfShape shapeToVertexMap;
+	TopExp::MapShapesAndAncestors(model, TopAbs_SHAPE, TopAbs_VERTEX, shapeToVertexMap);
+	TopTools_ListOfShape verticesList = shapeToVertexMap.FindFromKey(model);
 	TopTools_IndexedMapOfShape vertices;
 	TopExp::MapShapes(model, TopAbs_VERTEX, vertices);
 	TopTools_IndexedMapOfShape faces;
 	TopExp::MapShapes(model, TopAbs_FACE, faces);
+
+	double creaseParameter = 1 / (tan(0.5*creaseAngle)*tan(0.5*creaseAngle)) - 1;
+
 	int numFaces = faces.Size();
 
 	/******************************************************************************/
 	/*Check to see if duplicate vertices, need to do decide whether to handle case*/
 	/******************************************************************************/
-	TopoDS_Vertex first = TopoDS::Vertex(vertices.FindKey(1));
+	//TopoDS_Vertex first = TopoDS::Vertex(vertices.FindKey(1));
 	//auto faces = vertexToFaceMap.FindFromKey(first);
 	//assert(faces.Size() > 1); 
 	/******************************************************************************/
 	/******************************************************************************/
 	/******************************************************************************/
-	TopoDS_Vertex currentVertex = TopoDS::Vertex(vertices.FindKey(1));
-	auto currentFaces = vertexToFaceMap.FindFromKey(first);
+	
+	
 	int numProcessed = 0;
 	ExtractedFeatures features;
+	ExtractedFeature firstFeature;
+	features.push_back(firstFeature);
 	vector<TopoDS_Vertex> vertexQueue;
-	while (numProcessed<numFaces) 
+	vertexQueue.push_back(TopoDS::Vertex(verticesList.First()));
+	verticesList.RemoveFirst();
+	while (numProcessed<numFaces||!vertexQueue.empty()) 
 	{
 		
 		//get vertex
+		TopoDS_Vertex currentVertex = vertexQueue.back();
+		vertexQueue.pop_back();
+		auto currentFaces = vertexToFaceMap.FindFromKey(currentVertex);
+		//auto tempFaces = vertexToFaceMap.FindFromKey(currentVertex);
 		//get faces
 
 		//compute normal tensor
@@ -50,12 +64,11 @@ void FeatureExtractionAlgo::NormalTensorFrameworkMethod(TopoDS_Shape model, floa
 		normalSum << 0, 0, 0,
 			0, 0, 0,
 			0, 0, 0;
-		TopTools_ListOfShape tempFaces(currentFaces);
-		while(!tempFaces.IsEmpty())
+		//TopTools_ListOfShape tempFaces(currentFaces);
+		//while(!tempFaces.IsEmpty())
+		for (auto ite = currentFaces.begin(); ite != currentFaces.end(); ite++)
 		{
-			TopoDS_Face currentFace = TopoDS::Face(tempFaces.First());
-			tempFaces.RemoveFirst();
-			
+			TopoDS_Face currentFace = TopoDS::Face(*ite);
 
 			Standard_Real umin, umax, vmin, vmax;
 			BRepTools::UVBounds(currentFace, umin, umax, vmin, vmax);
@@ -95,7 +108,7 @@ void FeatureExtractionAlgo::NormalTensorFrameworkMethod(TopoDS_Shape model, floa
 		auto eigenValues = normalTensorSolver.eigenvalues();
 
 		//compute vertex classification
-		double creaseParameter = 1 / (tan(0.5*creaseAngle)*tan(0.5*creaseAngle)) - 1;
+
 		Vector3d vertexClassification(eigenValues.x().real() - eigenValues.y().real(),
 			creaseParameter * (eigenValues.y().real() - eigenValues.z().real()),
 			creaseParameter * eigenValues.z().real());
@@ -108,42 +121,52 @@ void FeatureExtractionAlgo::NormalTensorFrameworkMethod(TopoDS_Shape model, floa
 			if (features.back().NumFaces() == 0)
 			{
 				TopoDS_Face face;
-				for (size_t i = 0; i < currentFaces.Size(); i++)
+				for (auto ite = currentFaces.begin(); ite != currentFaces.end(); ite++)
 				{
-					face = TopoDS::Face(currentFaces.First());
-					currentFaces.RemoveFirst();
+					face = TopoDS::Face(*ite);
 					if (!features.IsFaceProcessed(face))
 						break;
 				}
 				features.back().AddFace(face);
-				features.back().AddVertex(currentVertex);
-			} 
+				numProcessed++;
+				auto verts = faceToVertexMap.FindFromKey(face);
+				for (auto ite = verts.begin(); ite != verts.end(); ite++)
+				{
+					if (*ite != currentVertex)
+					{
+						vertexQueue.push_back(TopoDS::Vertex(*ite));
+						verticesList.Remove(TopoDS::Vertex(*ite));
+					}
+				}
+			}
 			else
 			{
 
 			}
-			//features.back().AddVertex(currentVertex);
+			features.back().AddEdgeVertex(currentVertex,(EdgeVertexType)vertexClass);
 		} 
 		else
 		{
 			int n = currentFaces.Size();
-			for (size_t i = 0; i < n; i++)
+			for (auto ite = currentFaces.begin(); ite != currentFaces.end(); ite++)
 			{
-				auto face = TopoDS::Face(currentFaces.First());
-				currentFaces.RemoveFirst();
+				auto face = TopoDS::Face(*ite);
 				features.back().AddFace(face);
-				features.back().AddVertex(currentVertex);
-
+				//features.back().AddVertex(currentVertex);
+				numProcessed++;
 				auto faceVertices = faceToVertexMap.FindFromKey(face);
-				for (size_t j = 0; j < 3; j++)
+				for (auto ite2 = faceVertices.begin(); ite2 != faceVertices.end(); ite2++)
 				{
-					auto v = TopoDS::Vertex(faceVertices.First());
+					auto v = TopoDS::Vertex(*ite2);
 					if (v != currentVertex)
+					{
 						vertexQueue.push_back(v);
-					faceVertices.RemoveFirst();
+						verticesList.Remove(v);
+					}
 				}
 			}
 		}
+		features.back().AddVertex(currentVertex);
 		//if(feature line)
 		//{
 		//	if(first face)
@@ -164,6 +187,13 @@ void FeatureExtractionAlgo::NormalTensorFrameworkMethod(TopoDS_Shape model, floa
 		//	add faces vertices to queue
 		//	add faces to feature
 		//}
+
+		if (vertexQueue.empty()&& numProcessed<numFaces)
+		{
+			ExtractedFeature newFeature;
+			features.push_back(newFeature);
+		}
+
 	}
 }
 
@@ -176,6 +206,16 @@ bool FeatureExtractionAlgo::ExtractedFeatures::IsFaceProcessed(TopoDS_Face face)
 			return true;
 	}
 	return false;
+}
+
+void FeatureExtractionAlgo::ExtractedFeature::AddFace(TopoDS_Face face)
+{
+	for (size_t i = 0; i < faces.size(); i++)
+	{
+		if (faces[i] == face)
+			return;
+	}
+	faces.push_back(face);
 }
 
 bool FeatureExtractionAlgo::ExtractedFeature::ContainsFace(TopoDS_Face face)
