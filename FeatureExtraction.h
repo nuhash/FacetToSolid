@@ -35,6 +35,7 @@ public:
 		int NumFaces() { return faces.size(); }
 		bool ContainsFace(TopoDS_Face face);
 		bool ContainsVertex(TopoDS_Vertex vertex);
+		TopoDS_Face GetFace(int n) { return faces[n]; };
 	protected:
 	private:
 		vector<TopoDS_Face> faces;

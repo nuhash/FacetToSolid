@@ -1,4 +1,6 @@
 #include "occview.h"
+#include <vector>
+using namespace std;
 
 void OCCView::init(void)
 {
@@ -53,7 +55,7 @@ void OCCView::init(void)
 	// should be initialized here and controlled elsewhere, but for sake of brevity I just crammed it all in here.
 }
 
-void OCCView::drawShape(TopoDS_Shape &shape)
+void OCCView::drawShape(TopoDS_Shape &shape, bool update/*=true*/)
 {
 	mContext->RemoveAll();
 	Handle(AIS_Shape) newShape = new AIS_Shape(shape);
@@ -63,9 +65,18 @@ void OCCView::drawShape(TopoDS_Shape &shape)
 	mContext->Display(newShape, Standard_False);
 	mContext->SetCurrentObject(newShape, Standard_False);
 	currentShape = shape;
-
-	mView->FitAll();
+	
+	if (update)
+	{
+		mView->FitAll();
+		
+	}
 	mView->Redraw();
+}
+
+void OCCView::UpdateSelected(vector<TopoDS_Face> list)
+{
+	
 }
 
 void OCCView::reset(void)

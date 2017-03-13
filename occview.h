@@ -50,7 +50,7 @@
 #include <TopTools_ListOfShape.hxx>
 #include <wx/event.h>
 #include <wx/window.h>
-
+using namespace std;
 class OCCView
 {
 public:
@@ -64,8 +64,9 @@ public:
 
 	void init(void);
 
-	void drawShape(TopoDS_Shape &shape);
+	void drawShape(TopoDS_Shape &shape, bool update=true);
 
+	void UpdateSelected(vector<TopoDS_Face> list);
 	// some functions to control the camera/view
 	void reset(void);
 

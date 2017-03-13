@@ -6,7 +6,9 @@
 #include <wx/combobox.h>
 #include <StlAPI.hxx>
 #include <STEPControl_Writer.hxx>
+#include <TopoDS_Builder.hxx>
 #include "FeatureExtraction.h"
+#include <c:/OpenCASCADE7.1.0-vc10-64/opencascade-7.1.0/inc/TopoDS_Compound.hxx>
 // ----------------------------------------------------------------------------
 // constants
 // ----------------------------------------------------------------------------
@@ -20,6 +22,7 @@ enum
 	FTS_ExportCrude = wxID_HIGHEST + 2,
 	FTS_Open = wxID_OPEN,
 	FTS_ExtractFeatures = wxID_HIGHEST + 3,
+	FTS_FeatureSelect = wxID_HIGHEST +4,
 	// it is important for the id corresponding to the "About" command to have
 	// this standard value as otherwise it won't be handled properly under Mac
 	// (where it is special and put into the "Apple" menu)
@@ -39,6 +42,7 @@ EVT_MENU(FTS_About, MyFrame::OnAbout)
 EVT_MENU(FTS_Open, MyFrame::OnOpen)
 EVT_BUTTON(FTS_ExportCrude, MyFrame::OnCrudeExport)
 EVT_BUTTON(FTS_ExtractFeatures, MyFrame::OnExtractFeatures)
+EVT_LISTBOX(FTS_FeatureSelect, MyFrame::OnFeatureSelect)
 wxEND_EVENT_TABLE()
 
 // ----------------------------------------------------------------------------
@@ -134,6 +138,19 @@ void MyFrame::OnOpen(wxCommandEvent& event)
 	}
 }
 
+void MyFrame::OnFeatureSelect(wxCommandEvent& event)
+{
+	int pos = featureSel->GetSelection();
+	TopoDS_Compound tempShape;
+	TopoDS_Builder builder;
+	builder.MakeCompound(tempShape);
+	for (size_t i = 0; i < features.at(pos).NumFaces(); i++)
+	{
+		builder.Add(tempShape, features.at(pos).GetFace(i));
+	}
+	occView->drawShape(tempShape,false);
+}
+
 void MyFrame::Init()
 {
 	auto myNotebook = new wxNotebook(this, FTS_ModeNotebook, wxDefaultPosition, wxSize(300, 500));
@@ -150,7 +167,7 @@ void MyFrame::Init()
 	methodSelSizer->Add(extFeaturesButton, 0, wxALIGN_TOP, 0);
 	
 	auto featureSelSizer = new wxBoxSizer(wxVERTICAL);
-	featureSel = new wxListBox(featureExtPage,wxID_ANY);
+	featureSel = new wxListBox(featureExtPage,FTS_FeatureSelect);
 	featureSelSizer->Add(featureSel, 1, wxEXPAND|wxALIGN_TOP, 0);
 
 	auto featureSelButtonsSizer = new wxBoxSizer(wxHORIZONTAL);
@@ -192,7 +209,7 @@ void MyFrame::OnExtractFeatures(wxCommandEvent& event)
 	featureSel->Clear();
 	int currentSelection = extMethodList->GetCurrentSelection();
 
-	FeatureExtractionAlgo::ExtractedFeatures features;
+	
 
 	switch (currentSelection)
 	{
@@ -200,7 +217,7 @@ void MyFrame::OnExtractFeatures(wxCommandEvent& event)
 		features = FeatureExtractionAlgo::NormalTensorFrameworkMethod(occView->GetCurrentShape());
 		for (size_t i = 0; i < features.size(); i++)
 		{
-			wxString label = wxString::Format(wxT("Faces:%i"), features[i].NumFaces());
+			wxString label = wxString::Format(wxT("Faces:%i"), features.at(i).NumFaces());
 			featureSel->AppendString(label);
 		}
 		break;

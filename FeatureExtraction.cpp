@@ -13,6 +13,7 @@
 #include <GeomLProp_SLProps.hxx>
 #include <TopExp_Explorer.hxx>
 #include <algorithm>
+#include <stdio.h>
 
 using namespace Eigen;
 //#include 
@@ -59,6 +60,8 @@ FeatureExtractionAlgo::ExtractedFeatures FeatureExtractionAlgo::NormalTensorFram
 	vector<TopoDS_Vertex> vertexQueue;
 	vertexQueue.push_back(vertices.back());
 	vertices.pop_back();
+	freopen("output.txt", "w", stdout);
+	//cout << "write in file";
 	while (features.NumFaces()<numFaces||!vertexQueue.empty()) 
 	{
 		
@@ -76,6 +79,7 @@ FeatureExtractionAlgo::ExtractedFeatures FeatureExtractionAlgo::NormalTensorFram
 			0, 0, 0;
 		//TopTools_ListOfShape tempFaces(currentFaces);
 		//while(!tempFaces.IsEmpty())
+
 		for (auto ite = currentFaces.begin(); ite != currentFaces.end(); ite++)
 		{
 			TopoDS_Face currentFace = TopoDS::Face(*ite);
@@ -108,6 +112,7 @@ FeatureExtractionAlgo::ExtractedFeatures FeatureExtractionAlgo::NormalTensorFram
 			double currentWeight = sqrt(crossProduct.dot(crossProduct)) / (e1.dot(e1)*e2.dot(e2));
 
 			normalSum += currentWeight * currentNormal * currentNormal.transpose();
+			ite++;
 		}
 
 
@@ -183,6 +188,8 @@ FeatureExtractionAlgo::ExtractedFeatures FeatureExtractionAlgo::NormalTensorFram
 				for (faceToVertices.Init(face, TopAbs_VERTEX); faceToVertices.More()&&i<2; faceToVertices.Next())
 				{
 					auto v = TopoDS::Vertex(faceToVertices.Current());
+					auto cv = BRep_Tool::Pnt(v);
+					cout << cv.X() << ";" << cv.Y() << ";" << cv.Z() << ";\n";
 					if (!features.back().ContainsVertex(v)&&!IsVertexInQueue(vertexQueue,v))
 					{
 						vertexQueue.push_back(v);
@@ -190,8 +197,12 @@ FeatureExtractionAlgo::ExtractedFeatures FeatureExtractionAlgo::NormalTensorFram
 						vertices.erase(std::remove(vertices.begin(), vertices.end(), v), vertices.end());
 						i++;
 					}
+					//faceToVertices.More()
 				}
+				cout << "\n";
+				ite++;
 			}
+			cout << "------------------------------------------------------\n";
 		}
 		features.back().AddVertex(currentVertex);
 		//if(feature line)

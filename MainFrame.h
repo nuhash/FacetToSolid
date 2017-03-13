@@ -5,6 +5,7 @@
 #endif
 #include "OCCWindow.h"
 #include "occview.h"
+#include "FeatureExtraction.h"
 
 class MyFrame : public wxFrame
 {
@@ -17,6 +18,7 @@ public:
 	void OnAbout(wxCommandEvent& event);
 	void OnCrudeExport(wxCommandEvent& event);
 	void OnOpen(wxCommandEvent& event);
+	void OnFeatureSelect(wxCommandEvent& event);
 	void Init();
 	void OnExtractFeatures(wxCommandEvent& event);
 private:
@@ -25,5 +27,6 @@ private:
 	OCCView* occView;
 	wxChoice* extMethodList;
 	wxListBox *featureSel;
+	FeatureExtractionAlgo::ExtractedFeatures features;
 	wxDECLARE_EVENT_TABLE();
 };
