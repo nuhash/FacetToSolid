@@ -38,9 +38,15 @@ FeatureExtractionAlgo::ExtractedFeatures FeatureExtractionAlgo::NormalTensorFram
 		vertices.push_back(TopoDS::Vertex(vertexExp.Current()));
 	}
 
-	double creaseParameter = 1 / (tan(0.5*creaseAngle)*tan(0.5*creaseAngle)) - 1;
+	int numFaces = 0;
+	for (vertexExp.Init(model, TopAbs_FACE); vertexExp.More(); vertexExp.Next())
+	{
+		numFaces++;
+	}
 
-	int numFaces = faces.Size();
+	double creaseParameter = 5;// 1 / (tan(0.5*creaseAngle)*tan(0.5*creaseAngle)) - 1;
+
+	
 
 	/******************************************************************************/
 	/*Check to see if duplicate vertices, need to do decide whether to handle case*/
@@ -79,7 +85,11 @@ FeatureExtractionAlgo::ExtractedFeatures FeatureExtractionAlgo::NormalTensorFram
 			0, 0, 0;
 		//TopTools_ListOfShape tempFaces(currentFaces);
 		//while(!tempFaces.IsEmpty())
-
+		//currentFaces.Size()
+		if (currentFaces.Size()==8)
+		{
+			cout << "Crease check\n";
+		}
 		for (auto ite = currentFaces.begin(); ite != currentFaces.end(); ite++)
 		{
 			TopoDS_Face currentFace = TopoDS::Face(*ite);
@@ -111,10 +121,18 @@ FeatureExtractionAlgo::ExtractedFeatures FeatureExtractionAlgo::NormalTensorFram
 			
 			double currentWeight = sqrt(crossProduct.dot(crossProduct)) / (e1.dot(e1)*e2.dot(e2));
 
+			if (currentFaces.Size() == 8)
+			{
+				cout << normal.X() << ";" << normal.Y() << ";" << normal.Z() << ";" << currentWeight << "; \n";
+			}
+
 			normalSum += currentWeight * currentNormal * currentNormal.transpose();
 			ite++;
 		}
-
+		if (currentFaces.Size() == 8)
+		{
+			cout << "End crease check\n\n";
+		}
 
 		//compute eigen values, vectors
 
