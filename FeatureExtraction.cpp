@@ -11,9 +11,12 @@
 #include <BRepTools.hxx>
 
 #include <GeomLProp_SLProps.hxx>
+#include <TopExp_Explorer.hxx>
+#include <algorithm>
+
 using namespace Eigen;
 //#include 
-void FeatureExtractionAlgo::NormalTensorFrameworkMethod(TopoDS_Shape model, float creaseAngle /*= 5.0f*/)
+FeatureExtractionAlgo::ExtractedFeatures FeatureExtractionAlgo::NormalTensorFrameworkMethod(TopoDS_Shape model, float creaseAngle /*= 5.0f*/)
 {
 	TopTools_IndexedDataMapOfShapeListOfShape vertexToFaceMap;
 	TopExp::MapShapesAndAncestors(model, TopAbs_VERTEX, TopAbs_FACE, vertexToFaceMap);
@@ -21,11 +24,18 @@ void FeatureExtractionAlgo::NormalTensorFrameworkMethod(TopoDS_Shape model, floa
 	TopExp::MapShapesAndAncestors(model, TopAbs_FACE, TopAbs_VERTEX, faceToVertexMap);
 	TopTools_IndexedDataMapOfShapeListOfShape shapeToVertexMap;
 	TopExp::MapShapesAndAncestors(model, TopAbs_SHAPE, TopAbs_VERTEX, shapeToVertexMap);
-	TopTools_ListOfShape verticesList = shapeToVertexMap.FindFromKey(model);
-	TopTools_IndexedMapOfShape vertices;
-	TopExp::MapShapes(model, TopAbs_VERTEX, vertices);
+	//TopTools_ListOfShape verticesList = shapeToVertexMap.FindKey(1);//FromKey(model);
+	//TopTools_IndexedMapOfShape vertices;
+	//TopExp::MapShapes(model, TopAbs_VERTEX, vertices);
 	TopTools_IndexedMapOfShape faces;
 	TopExp::MapShapes(model, TopAbs_FACE, faces);
+
+	TopExp_Explorer vertexExp;
+	vector<TopoDS_Vertex> vertices;
+	for (vertexExp.Init(model, TopAbs_VERTEX); vertexExp.More(); vertexExp.Next())
+	{
+		vertices.push_back(TopoDS::Vertex(vertexExp.Current()));
+	}
 
 	double creaseParameter = 1 / (tan(0.5*creaseAngle)*tan(0.5*creaseAngle)) - 1;
 
@@ -47,9 +57,9 @@ void FeatureExtractionAlgo::NormalTensorFrameworkMethod(TopoDS_Shape model, floa
 	ExtractedFeature firstFeature;
 	features.push_back(firstFeature);
 	vector<TopoDS_Vertex> vertexQueue;
-	vertexQueue.push_back(TopoDS::Vertex(verticesList.First()));
-	verticesList.RemoveFirst();
-	while (numProcessed<numFaces||!vertexQueue.empty()) 
+	vertexQueue.push_back(vertices.back());
+	vertices.pop_back();
+	while (features.NumFaces()<numFaces||!vertexQueue.empty()) 
 	{
 		
 		//get vertex
@@ -130,14 +140,28 @@ void FeatureExtractionAlgo::NormalTensorFrameworkMethod(TopoDS_Shape model, floa
 				features.back().AddFace(face);
 				numProcessed++;
 				auto verts = faceToVertexMap.FindFromKey(face);
-				for (auto ite = verts.begin(); ite != verts.end(); ite++)
+				TopExp_Explorer faceToVertices;
+				int i = 0;
+				for (faceToVertices.Init(face, TopAbs_VERTEX); faceToVertices.More()&&i<2; faceToVertices.Next())
 				{
-					if (*ite != currentVertex)
+					auto v = TopoDS::Vertex(faceToVertices.Current());
+					if (!currentVertex.IsSame(v)&&!IsVertexInQueue(vertexQueue, v))
 					{
-						vertexQueue.push_back(TopoDS::Vertex(*ite));
-						verticesList.Remove(TopoDS::Vertex(*ite));
+						vertexQueue.push_back(v);
+						//verticesList.Remove(TopoDS::Vertex(*ite));
+						vertices.erase(std::remove(vertices.begin(), vertices.end(), v), vertices.end());
+						i++;
 					}
 				}
+				//for (auto ite = verts.begin(); ite != verts.end(); ite++)
+				//{
+				//	if (*ite != currentVertex)
+				//	{
+				//		vertexQueue.push_back(TopoDS::Vertex(*ite));
+				//		//verticesList.Remove(TopoDS::Vertex(*ite));
+				//		vertices.erase(std::remove(vertices.begin(), vertices.end(), *ite), vertices.end());
+				//	}
+				//}
 			}
 			else
 			{
@@ -154,14 +178,17 @@ void FeatureExtractionAlgo::NormalTensorFrameworkMethod(TopoDS_Shape model, floa
 				features.back().AddFace(face);
 				//features.back().AddVertex(currentVertex);
 				numProcessed++;
-				auto faceVertices = faceToVertexMap.FindFromKey(face);
-				for (auto ite2 = faceVertices.begin(); ite2 != faceVertices.end(); ite2++)
+				TopExp_Explorer faceToVertices;
+				int i = 0;
+				for (faceToVertices.Init(face, TopAbs_VERTEX); faceToVertices.More()&&i<2; faceToVertices.Next())
 				{
-					auto v = TopoDS::Vertex(*ite2);
-					if (v != currentVertex)
+					auto v = TopoDS::Vertex(faceToVertices.Current());
+					if (!features.back().ContainsVertex(v)&&!IsVertexInQueue(vertexQueue,v))
 					{
 						vertexQueue.push_back(v);
-						verticesList.Remove(v);
+						//verticesList.Remove(TopoDS::Vertex(*ite));
+						vertices.erase(std::remove(vertices.begin(), vertices.end(), v), vertices.end());
+						i++;
 					}
 				}
 			}
@@ -188,13 +215,16 @@ void FeatureExtractionAlgo::NormalTensorFrameworkMethod(TopoDS_Shape model, floa
 		//	add faces to feature
 		//}
 
-		if (vertexQueue.empty()&& numProcessed<numFaces)
+		if (vertexQueue.empty()&& features.NumFaces()<numFaces)
 		{
 			ExtractedFeature newFeature;
 			features.push_back(newFeature);
+			vertexQueue.push_back(vertices.back());
+			vertices.pop_back();
 		}
 
 	}
+	return features;
 }
 
 bool FeatureExtractionAlgo::ExtractedFeatures::IsFaceProcessed(TopoDS_Face face)
@@ -208,13 +238,35 @@ bool FeatureExtractionAlgo::ExtractedFeatures::IsFaceProcessed(TopoDS_Face face)
 	return false;
 }
 
+bool FeatureExtractionAlgo::ExtractedFeatures::IsVertexProcessed(TopoDS_Vertex vertex)
+{
+	for (size_t i = 0; i < this->size(); i++)
+	{
+		auto currentFeature = this->at(i);
+		if (currentFeature.ContainsVertex(vertex))
+			return true;
+	}
+	return false;
+}
+
+int FeatureExtractionAlgo::ExtractedFeatures::NumFaces()
+{
+	int result = 0;
+	for (size_t i = 0; i < this->size(); i++)
+	{
+		result += this->at(i).NumFaces();
+	}
+	return result;
+}
+
 void FeatureExtractionAlgo::ExtractedFeature::AddFace(TopoDS_Face face)
 {
-	for (size_t i = 0; i < faces.size(); i++)
+	/*for (size_t i = 0; i < faces.size(); i++)
 	{
-		if (faces[i] == face)
+		if (face.IsSame(faces[i]))
 			return;
-	}
+	}*/
+	if(!ContainsFace(face))
 	faces.push_back(face);
 }
 
@@ -222,7 +274,17 @@ bool FeatureExtractionAlgo::ExtractedFeature::ContainsFace(TopoDS_Face face)
 {
 	for (size_t i = 0; i < faces.size(); i++)
 	{
-		if (face == faces[i])
+		if (face.IsSame(faces[i]))
+			return true;
+	}
+	return false;
+}
+
+bool FeatureExtractionAlgo::ExtractedFeature::ContainsVertex(TopoDS_Vertex vertex)
+{
+	for (size_t i = 0; i < vertices.size(); i++)
+	{
+		if (vertex.IsSame(vertices[i]))
 			return true;
 	}
 	return false;

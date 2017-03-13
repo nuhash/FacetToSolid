@@ -12,7 +12,7 @@ using namespace std;
 class FeatureExtractionAlgo
 {
 public:
-	static void NormalTensorFrameworkMethod(TopoDS_Shape model, float creaseAngle = 5.0f);
+	
 	enum EdgeVertexType
 	{
 		CREASE = 1,
@@ -31,9 +31,10 @@ public:
 	public:
 		void AddFace(TopoDS_Face face);
 		void AddVertex(TopoDS_Vertex vertex) { vertices.push_back(vertex); }
-		void AddEdgeVertex(TopoDS_Vertex vertex, EdgeVertexType type) { edgeVertices.push_back(vertex); edgeVerticesTypes.push_back(type); }
+		void AddEdgeVertex(TopoDS_Vertex vertex, EdgeVertexType type) { this->AddVertex(vertex); edgeVertices.push_back(vertex); edgeVerticesTypes.push_back(type); }
 		int NumFaces() { return faces.size(); }
 		bool ContainsFace(TopoDS_Face face);
+		bool ContainsVertex(TopoDS_Vertex vertex);
 	protected:
 	private:
 		vector<TopoDS_Face> faces;
@@ -46,15 +47,28 @@ public:
 	{
 	public:
 		bool IsFaceProcessed(TopoDS_Face face);
+		bool IsVertexProcessed(TopoDS_Vertex vertex);
+		int NumFaces();;
 	protected:
 	private:
 	};
 
-
+	static ExtractedFeatures NormalTensorFrameworkMethod(TopoDS_Shape model, float creaseAngle = 5.0f);
 
 
 
 protected:
 
 private:
+	static bool IsVertexInQueue(vector<TopoDS_Vertex> list, TopoDS_Vertex vertex)
+	{
+		for (size_t i = 0; i < list.size(); i++)
+		{
+			if (vertex.IsSame(list[i]))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
 };

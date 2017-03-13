@@ -24,5 +24,6 @@ private:
 	OCCWindow *occWindow;
 	OCCView* occView;
 	wxChoice* extMethodList;
+	wxListBox *featureSel;
 	wxDECLARE_EVENT_TABLE();
 };

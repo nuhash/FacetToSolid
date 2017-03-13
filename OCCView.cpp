@@ -39,8 +39,9 @@ void OCCView::init(void)
 	mView->TriedronDisplay(Aspect_TOTP_LEFT_LOWER, Quantity_NOC_GOLD, 0.08, V3d_ZBUFFER);
 	mContext = new AIS_InteractiveContext(mViewer);
 	mContext->SetDisplayMode(AIS_Shaded);
-
+	
 	aBottle = MakeBottle(50, 70, 30);
+
 	drawShape(aBottle);
 	/*Handle(AIS_Shape) AISBottle = new AIS_Shape(aBottle);
 	mContext->SetMaterial(AISBottle, Graphic3d_NOM_GOLD);
@@ -56,6 +57,7 @@ void OCCView::drawShape(TopoDS_Shape &shape)
 {
 	mContext->RemoveAll();
 	Handle(AIS_Shape) newShape = new AIS_Shape(shape);
+	newShape->SelectionMode(TopAbs_FACE);
 	mContext->SetMaterial(newShape, Graphic3d_NOM_GOLD);
 	mContext->SetDisplayMode(newShape, 1, Standard_False);
 	mContext->Display(newShape, Standard_False);

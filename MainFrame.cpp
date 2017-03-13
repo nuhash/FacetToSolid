@@ -150,7 +150,7 @@ void MyFrame::Init()
 	methodSelSizer->Add(extFeaturesButton, 0, wxALIGN_TOP, 0);
 	
 	auto featureSelSizer = new wxBoxSizer(wxVERTICAL);
-	auto featureSel = new wxListBox(featureExtPage,wxID_ANY);
+	featureSel = new wxListBox(featureExtPage,wxID_ANY);
 	featureSelSizer->Add(featureSel, 1, wxEXPAND|wxALIGN_TOP, 0);
 
 	auto featureSelButtonsSizer = new wxBoxSizer(wxHORIZONTAL);
@@ -189,14 +189,25 @@ void MyFrame::Init()
 
 void MyFrame::OnExtractFeatures(wxCommandEvent& event)
 {
+	featureSel->Clear();
 	int currentSelection = extMethodList->GetCurrentSelection();
+
+	FeatureExtractionAlgo::ExtractedFeatures features;
 
 	switch (currentSelection)
 	{
 	case 0: //Normal tensor framework method
-		FeatureExtractionAlgo::NormalTensorFrameworkMethod(occView->GetCurrentShape());
+		features = FeatureExtractionAlgo::NormalTensorFrameworkMethod(occView->GetCurrentShape());
+		for (size_t i = 0; i < features.size(); i++)
+		{
+			wxString label = wxString::Format(wxT("Faces:%i"), features[i].NumFaces());
+			featureSel->AppendString(label);
+		}
 		break;
 	default:
 		break;
 	}
+
+
 }
+
