@@ -32,10 +32,11 @@ FeatureExtractionAlgo::ExtractedFeatures FeatureExtractionAlgo::NormalTensorFram
 	TopExp::MapShapes(model, TopAbs_FACE, faces);
 
 	TopExp_Explorer vertexExp;
-	vector<TopoDS_Vertex> vertices;
+	//vector<TopoDS_Vertex> 
+	VerticesSet vertices;
 	for (vertexExp.Init(model, TopAbs_VERTEX); vertexExp.More(); vertexExp.Next())
 	{
-		vertices.push_back(TopoDS::Vertex(vertexExp.Current()));
+		vertices.insert(TopoDS::Vertex(vertexExp.Current()));
 	}
 
 	int numFaces = 0;
@@ -64,8 +65,8 @@ FeatureExtractionAlgo::ExtractedFeatures FeatureExtractionAlgo::NormalTensorFram
 	ExtractedFeature firstFeature;
 	features.push_back(firstFeature);
 	vector<TopoDS_Vertex> vertexQueue;
-	vertexQueue.push_back(vertices.back());
-	vertices.pop_back();
+	vertexQueue.push_back(*(vertices.rbegin()));
+	vertices.erase(*(vertices.rbegin()));
 	freopen("output.txt", "w", stdout);
 	//cout << "write in file";
 	while (features.NumFaces()<numFaces||!vertexQueue.empty()) 
@@ -79,16 +80,17 @@ FeatureExtractionAlgo::ExtractedFeatures FeatureExtractionAlgo::NormalTensorFram
 		//get faces
 
 		//compute normal tensor
-		Matrix3d normalSum;
-		normalSum << 0, 0, 0,
+		Matrix3d normalTensorSum;
+		normalTensorSum << 0, 0, 0,
 			0, 0, 0,
 			0, 0, 0;
+		Vector3d normalSum(0, 0, 0);
 		//TopTools_ListOfShape tempFaces(currentFaces);
 		//while(!tempFaces.IsEmpty())
 		//currentFaces.Size()
-		if (currentFaces.Size()==8)
+		if (true)
 		{
-			cout << "Crease check\n";
+			cout << "Surface check\n";
 		}
 		for (auto ite = currentFaces.begin(); ite != currentFaces.end(); ite++)
 		{
@@ -120,35 +122,46 @@ FeatureExtractionAlgo::ExtractedFeatures FeatureExtractionAlgo::NormalTensorFram
 			Vector3d crossProduct = e1.cross(e2);
 			
 			double currentWeight = sqrt(crossProduct.dot(crossProduct)) / (e1.dot(e1)*e2.dot(e2));
-
-			if (currentFaces.Size() == 8)
+			auto inter = currentNormal * currentNormal.transpose();
+			if (true)
 			{
 				cout << normal.X() << ";" << normal.Y() << ";" << normal.Z() << ";" << currentWeight << "; \n";
+				
+				cout << inter << "\n\n";
 			}
 
-			normalSum += currentWeight * currentNormal * currentNormal.transpose();
+			
+			normalTensorSum += currentWeight * inter;
+			normalSum += currentWeight * currentNormal;
 			ite++;
 		}
-		if (currentFaces.Size() == 8)
-		{
-			cout << "End crease check\n\n";
-		}
+
 
 		//compute eigen values, vectors
 
-		EigenSolver<Matrix3d> normalTensorSolver(normalSum, true);
+		EigenSolver<Matrix3d> normalTensorSolver(normalTensorSum, true);
 		auto eigenvectors = normalTensorSolver.eigenvectors();
-		auto eigenValues = normalTensorSolver.eigenvalues();
-
+		auto eigenValuesComplex = normalTensorSolver.eigenvalues();
+		Vector3d eigenValues(eigenValuesComplex.x().real(), eigenValuesComplex.y().real(), eigenValuesComplex.z().real());
+		std::sort(eigenValues.data(), eigenValues.data() + eigenValues.size());
+		eigenValues.reverseInPlace();
 		//compute vertex classification
 
-		Vector3d vertexClassification(eigenValues.x().real() - eigenValues.y().real(),
-			creaseParameter * (eigenValues.y().real() - eigenValues.z().real()),
-			creaseParameter * eigenValues.z().real());
+		Vector3d vertexClassification(eigenValues.x() - eigenValues.y(),
+			creaseParameter * (eigenValues.y() - eigenValues.z()),
+			creaseParameter * eigenValues.z());
 		
 		Vector3d::Index vertexClass;
 		vertexClassification.maxCoeff(&vertexClass);
-
+		if (true)
+		{
+			cout << normalTensorSum << "\n";
+			cout << normalSum.x() << ";" << normalSum.y() << ";" << normalSum.z() << ";\n";
+			cout << eigenValues << "\n";
+			cout << eigenvectors << "\n";
+			cout << vertexClassification.x() << ";" << vertexClassification.y() << ";" << vertexClassification.z() << "\n\n";
+			cout << "End surface check\n\n";
+		}
 		if (vertexClass>0)
 		{
 			if (features.back().NumFaces() == 0)
@@ -172,7 +185,7 @@ FeatureExtractionAlgo::ExtractedFeatures FeatureExtractionAlgo::NormalTensorFram
 					{
 						vertexQueue.push_back(v);
 						//verticesList.Remove(TopoDS::Vertex(*ite));
-						vertices.erase(std::remove(vertices.begin(), vertices.end(), v), vertices.end());
+						vertices.erase(v);
 						i++;
 					}
 				}
@@ -191,6 +204,7 @@ FeatureExtractionAlgo::ExtractedFeatures FeatureExtractionAlgo::NormalTensorFram
 
 			}
 			features.back().AddEdgeVertex(currentVertex,(EdgeVertexType)vertexClass);
+			//vertices.insert(currentVertex);
 		} 
 		else
 		{
@@ -212,7 +226,7 @@ FeatureExtractionAlgo::ExtractedFeatures FeatureExtractionAlgo::NormalTensorFram
 					{
 						vertexQueue.push_back(v);
 						//verticesList.Remove(TopoDS::Vertex(*ite));
-						vertices.erase(std::remove(vertices.begin(), vertices.end(), v), vertices.end());
+						vertices.erase(v);
 						i++;
 					}
 					//faceToVertices.More()
@@ -248,8 +262,8 @@ FeatureExtractionAlgo::ExtractedFeatures FeatureExtractionAlgo::NormalTensorFram
 		{
 			ExtractedFeature newFeature;
 			features.push_back(newFeature);
-			vertexQueue.push_back(vertices.back());
-			vertices.pop_back();
+			vertexQueue.push_back(*(vertices.rbegin()));
+			vertices.erase(*(vertices.rbegin()));
 		}
 
 	}
@@ -288,6 +302,14 @@ int FeatureExtractionAlgo::ExtractedFeatures::NumFaces()
 	return result;
 }
 
+void FeatureExtractionAlgo::ExtractedFeatures::ProcessEdges(TopoDS_Shape shape)
+{
+	for (size_t i = 0; i < size(); i++)
+	{
+		at(i).ProcessEdges(shape);
+	}
+}
+
 void FeatureExtractionAlgo::ExtractedFeature::AddFace(TopoDS_Face face)
 {
 	/*for (size_t i = 0; i < faces.size(); i++)
@@ -317,4 +339,50 @@ bool FeatureExtractionAlgo::ExtractedFeature::ContainsVertex(TopoDS_Vertex verte
 			return true;
 	}
 	return false;
+}
+
+TopoDS_Vertex FeatureExtractionAlgo::ExtractedFeature::GetNearbyEdgeVertex(TopoDS_Shape shape, TopoDS_Vertex vertex)
+{
+
+}
+
+void FeatureExtractionAlgo::ExtractedFeature::ProcessEdges(TopoDS_Shape shape)
+{
+	TopTools_IndexedDataMapOfShapeListOfShape vertexToEdgeMap;
+	TopExp::MapShapesAndAncestors(shape, TopAbs_VERTEX, TopAbs_FACE, vertexToEdgeMap);
+
+	extractedEdges.push_back(ExtractedFeatureEdge());
+	int cornerPos = FindCornerVertex();
+	if (cornerPos == -1) //Continuous edge/s
+	{
+		extractedEdges.back().Type(CONTINUOUS);
+		extractedEdges.back().AddVertex(edgeVertices.back());
+		edgeVertices.pop_back();
+		edgeVerticesTypes.pop_back();
+	}
+	else
+	{
+		extractedEdges.back().Type(FINITE);
+		extractedEdges.back().AddVertex(edgeVertices.at(cornerPos));
+		edgeVertices.erase(edgeVertices.begin() + cornerPos);
+		edgeVerticesTypes.erase(edgeVerticesTypes.begin() + cornerPos);
+	}
+	
+	while (edgeVertices.size()>0)
+	{
+
+	}
+}
+
+int FeatureExtractionAlgo::ExtractedFeature::FindCornerVertex()
+{
+	int i;
+	for (i = 0; i < edgeVerticesTypes.size(); i++)
+	{
+		if (edgeVerticesTypes[i]==EdgeVertexType::CORNER)
+		{
+			return i;
+		}
+	}
+	return -1;
 }
