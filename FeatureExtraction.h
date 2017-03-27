@@ -35,11 +35,11 @@ public:
 		CONTINUOUS,
 		FINITE
 	};
-	class ExtractedFeatureEdge
+	class ExtractedFeatureEdge : public vector<TopoDS_Vertex>
 	{
 	public:
 		FeatureExtractionAlgo::EdgeType Type() const { return type; }
-		void AddVertex(TopoDS_Vertex vertex) { edgeVertices.push_back(vertex); }
+		void AddVertex(TopoDS_Vertex vertex) { push_back(vertex); }
 		void Type(FeatureExtractionAlgo::EdgeType val) { type = val; }
 	protected:
 	private:
@@ -60,6 +60,10 @@ public:
 		TopoDS_Vertex GetNearbyEdgeVertex(TopoDS_Shape shape, TopoDS_Vertex vertex);
 		void ProcessEdges(TopoDS_Shape shape);
 		int FindCornerVertex();
+		bool CreateNewEdge(vector<ExtractedFeatureEdge>& queue, TopTools_IndexedDataMapOfShapeListOfShape v2e, TopoDS_Vertex &vertex, EdgeVertexType &type);
+		int FindEdgeVertex(TopoDS_Vertex vertex);
+		bool IsVertexEdge(TopoDS_Vertex vertex);
+		bool IsVertexEdgeProcessed(TopoDS_Vertex vertex);
 	protected:
 	private:
 		vector<TopoDS_Face> faces;
@@ -97,5 +101,18 @@ private:
 			}
 		}
 		return false;
+	}
+
+	static int FindVertex(vector<TopoDS_Vertex> list, TopoDS_Vertex vertex)
+	{
+		int i;
+		for (i = 0; i < list.size(); i++)
+		{
+			if (vertex.IsSame(list[i]))
+			{
+				return i;
+			}
+		}
+		return -1;
 	}
 };
