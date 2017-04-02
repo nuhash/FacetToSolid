@@ -343,7 +343,7 @@ bool FeatureExtractionAlgo::ExtractedFeature::ContainsVertex(TopoDS_Vertex verte
 
 TopoDS_Vertex FeatureExtractionAlgo::ExtractedFeature::GetNearbyEdgeVertex(TopoDS_Shape shape, TopoDS_Vertex vertex)
 {
-
+	return vertex;
 }
 
 void FeatureExtractionAlgo::ExtractedFeature::ProcessEdges(TopoDS_Shape shape)
@@ -381,7 +381,7 @@ void FeatureExtractionAlgo::ExtractedFeature::ProcessEdges(TopoDS_Shape shape)
 				v = second;
 			}
 
-			if (workingEdge.Type == FINITE && IsVertexEdgeProcessed(v)) //Check if vertex is a corner
+			if (workingEdge.Type() == FINITE && IsVertexEdgeProcessed(v)) //Check if vertex is a corner
 			{
 				workingEdge.AddVertex(v);
 				processed = true;
