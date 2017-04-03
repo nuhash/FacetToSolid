@@ -3,6 +3,7 @@
 #ifndef WX_PRECOMP
 #include "wx/wx.h"
 #endif
+#include <wx/notebook.h>
 #include "OCCWindow.h"
 #include "occview.h"
 #include "FeatureExtraction.h"
@@ -21,12 +22,15 @@ public:
 	void OnFeatureSelect(wxCommandEvent& event);
 	void Init();
 	void OnExtractFeatures(wxCommandEvent& event);
+	void OnCategorise(wxCommandEvent& event);
 private:
 	// any class wishing to process wxWidgets events must use this macro
 	OCCWindow *occWindow;
 	OCCView* occView;
 	wxChoice* extMethodList;
 	wxListBox *featureSel;
+	wxListBox *featureSel2;
+	wxNotebook *myNotebook;
 	FeatureExtractionAlgo::ExtractedFeatures features;
 	wxDECLARE_EVENT_TABLE();
 };

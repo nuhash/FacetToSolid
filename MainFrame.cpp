@@ -1,7 +1,7 @@
 #include "MainFrame.h"
 #include <occview.h>
 #include "OCCWindow.h"
-#include <wx/notebook.h>
+
 #include <wx/listctrl.h>
 #include <wx/combobox.h>
 #include <StlAPI.hxx>
@@ -23,6 +23,7 @@ enum
 	FTS_Open = wxID_OPEN,
 	FTS_ExtractFeatures = wxID_HIGHEST + 3,
 	FTS_FeatureSelect = wxID_HIGHEST +4,
+	FTS_CategoriseFeatures = wxID_HIGHEST +5,
 	// it is important for the id corresponding to the "About" command to have
 	// this standard value as otherwise it won't be handled properly under Mac
 	// (where it is special and put into the "Apple" menu)
@@ -43,6 +44,7 @@ EVT_MENU(FTS_Open, MyFrame::OnOpen)
 EVT_BUTTON(FTS_ExportCrude, MyFrame::OnCrudeExport)
 EVT_BUTTON(FTS_ExtractFeatures, MyFrame::OnExtractFeatures)
 EVT_LISTBOX(FTS_FeatureSelect, MyFrame::OnFeatureSelect)
+EVT_BUTTON(FTS_CategoriseFeatures, MyFrame::OnCategorise)
 wxEND_EVENT_TABLE()
 
 // ----------------------------------------------------------------------------
@@ -140,7 +142,11 @@ void MyFrame::OnOpen(wxCommandEvent& event)
 
 void MyFrame::OnFeatureSelect(wxCommandEvent& event)
 {
-	int pos = featureSel->GetSelection();
+	int pos = 0;
+	if (myNotebook->GetSelection() == 0)
+		pos = featureSel->GetSelection();
+	else
+		pos = featureSel2->GetSelection();
 	TopoDS_Compound tempShape;
 	TopoDS_Builder builder;
 	builder.MakeCompound(tempShape);
@@ -153,7 +159,7 @@ void MyFrame::OnFeatureSelect(wxCommandEvent& event)
 
 void MyFrame::Init()
 {
-	auto myNotebook = new wxNotebook(this, FTS_ModeNotebook, wxDefaultPosition, wxSize(300, 500));
+	myNotebook = new wxNotebook(this, FTS_ModeNotebook, wxDefaultPosition, wxSize(300, 500));
 	auto featureExtPage = new wxPanel(myNotebook, -1);
 	
 	auto featureExtSizer = new wxBoxSizer(wxVERTICAL);
@@ -184,8 +190,18 @@ void MyFrame::Init()
 	featureExtPage->SetSizer(featureExtSizer);
 	
 	myNotebook->AddPage(featureExtPage, L"Feature Extraction");
+
 	auto surfFitPage = new wxPanel(myNotebook, -1);
+	auto surfFitSizer = new wxBoxSizer(wxVERTICAL);
+	auto featureSelSizer2 = new wxBoxSizer(wxVERTICAL);
+	featureSel2 = new wxListBox(surfFitPage, FTS_FeatureSelect);
+	auto categoriseButton = new wxButton(surfFitPage, FTS_CategoriseFeatures, "Categorise Features");
+	featureSelSizer2->Add(featureSel2, 1, wxEXPAND | wxALIGN_TOP, 0);
+	featureSelSizer2->Add(categoriseButton, 1, wxEXPAND);
+	surfFitSizer->Add(featureSelSizer2);
+	surfFitPage->SetSizer(surfFitSizer);
 	myNotebook->AddPage(surfFitPage, L"Surface Fitting");
+
 	auto exportPage = new wxPanel(myNotebook, -1);
 	auto cloneButton = new wxButton(exportPage, FTS_ExportCrude, "Export Crude Conversion");
 	myNotebook->AddPage(exportPage, L"Export");
@@ -217,14 +233,20 @@ void MyFrame::OnExtractFeatures(wxCommandEvent& event)
 		features = FeatureExtractionAlgo::NormalTensorFrameworkMethod(occView->GetCurrentShape());
 		for (size_t i = 0; i < features.size(); i++)
 		{
-			wxString label = wxString::Format(wxT("Faces:%i"), features.at(i).NumFaces());
+			wxString label = wxString::Format(wxT("Faces:%i;Edges:%i"), features.at(i).NumFaces(), features.at(i).NumEdges());
 			featureSel->AppendString(label);
+			featureSel2->AppendString(label);
 		}
 		break;
 	default:
 		break;
 	}
 
+
+}
+
+void MyFrame::OnCategorise(wxCommandEvent& event)
+{
 
 }
 

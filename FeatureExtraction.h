@@ -64,6 +64,8 @@ public:
 		int FindEdgeVertex(TopoDS_Vertex vertex);
 		bool IsVertexEdge(TopoDS_Vertex vertex);
 		bool IsVertexEdgeProcessed(TopoDS_Vertex vertex);
+		const vector<TopoDS_Face> GetFaces() { return faces; }
+		int NumEdges() { return extractedEdges.size(); }
 	protected:
 	private:
 		vector<TopoDS_Face> faces;

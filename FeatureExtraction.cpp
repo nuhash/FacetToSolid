@@ -267,6 +267,7 @@ FeatureExtractionAlgo::ExtractedFeatures FeatureExtractionAlgo::NormalTensorFram
 		}
 
 	}
+	//features.ProcessEdges(model);
 	return features;
 }
 
@@ -349,7 +350,7 @@ TopoDS_Vertex FeatureExtractionAlgo::ExtractedFeature::GetNearbyEdgeVertex(TopoD
 void FeatureExtractionAlgo::ExtractedFeature::ProcessEdges(TopoDS_Shape shape)
 {
 	TopTools_IndexedDataMapOfShapeListOfShape vertexToEdgeMap;
-	TopExp::MapShapesAndAncestors(shape, TopAbs_VERTEX, TopAbs_FACE, vertexToEdgeMap);
+	TopExp::MapShapesAndAncestors(shape, TopAbs_VERTEX, TopAbs_EDGE, vertexToEdgeMap);
 
 	TopoDS_Vertex currentVertex;
 	EdgeVertexType currentType;
@@ -402,6 +403,9 @@ void FeatureExtractionAlgo::ExtractedFeature::ProcessEdges(TopoDS_Shape shape)
 			workingEdge.AddVertex(v);
 			int pos = FindEdgeVertex(v);
 			auto type = edgeVerticesTypes[pos];
+			currentVertex = v;
+			currentEdges = vertexToEdgeMap.FindFromKey(currentVertex);
+			ite = currentEdges.begin();
 			if (type==CORNER)
 			{
 				//Edge has ended
@@ -459,6 +463,7 @@ bool FeatureExtractionAlgo::ExtractedFeature::CreateNewEdge(vector<ExtractedFeat
 		edgeVertices.pop_back();
 		type = edgeVerticesTypes.back();
 		edgeVerticesTypes.pop_back();
+		queue.push_back(newEdge);
 	}
 	else
 	{
