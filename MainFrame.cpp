@@ -9,6 +9,7 @@
 #include <TopoDS_Builder.hxx>
 #include "FeatureExtraction.h"
 #include <c:/OpenCASCADE7.1.0-vc10-64/opencascade-7.1.0/inc/TopoDS_Compound.hxx>
+#include "FeatureCategorisation.h"
 // ----------------------------------------------------------------------------
 // constants
 // ----------------------------------------------------------------------------
@@ -196,8 +197,10 @@ void MyFrame::Init()
 	auto featureSelSizer2 = new wxBoxSizer(wxVERTICAL);
 	featureSel2 = new wxListBox(surfFitPage, FTS_FeatureSelect);
 	auto categoriseButton = new wxButton(surfFitPage, FTS_CategoriseFeatures, "Categorise Features");
+	categoryInfo = new wxListBox(surfFitPage, -1);
 	featureSelSizer2->Add(featureSel2, 1, wxEXPAND | wxALIGN_TOP, 0);
 	featureSelSizer2->Add(categoriseButton, 1, wxEXPAND);
+	featureSelSizer2->Add(categoryInfo,1,wxEXPAND);
 	surfFitSizer->Add(featureSelSizer2);
 	surfFitPage->SetSizer(surfFitSizer);
 	myNotebook->AddPage(surfFitPage, L"Surface Fitting");
@@ -247,6 +250,12 @@ void MyFrame::OnExtractFeatures(wxCommandEvent& event)
 
 void MyFrame::OnCategorise(wxCommandEvent& event)
 {
-
+	for (size_t i = 0; i < features.size(); i++)
+	{
+		auto cat = FeatureCategorisation::Categorise(features[i]);
+		wxString label = wxString::Format(wxT("Faces:%i;Edges:%i;Category:%i"), features.at(i).NumFaces(), features.at(i).NumEdges(),cat);
+		categoryInfo->AppendString(label);
+	}
+	
 }
 

@@ -30,6 +30,7 @@ private:
 	wxChoice* extMethodList;
 	wxListBox *featureSel;
 	wxListBox *featureSel2;
+	wxListBox *categoryInfo;
 	wxNotebook *myNotebook;
 	FeatureExtractionAlgo::ExtractedFeatures features;
 	wxDECLARE_EVENT_TABLE();
