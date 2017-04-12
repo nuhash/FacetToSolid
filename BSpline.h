@@ -7,18 +7,18 @@
 using namespace std;
 using namespace Eigen;
 
-template <class T>
+template <class Scalar>
 class BSpline3D
 {
 public:
 	BSpline3D(int order, int numControlPoints);
-	Vector3d Sample(T t) const;
+	Vector3d Sample(Scalar t) const;
 protected:
-	int KnotSpan(T t) const;
-	T BasisFunction(T u, int controlPoint, int degree);
+	int KnotSpan(Scalar t) const;
+	Scalar BasisFunction(Scalar u, int controlPoint, int degree);
 private:
 	vector<Vector2d> controlPoints;
-	vector<T> knots;
+	vector<Scalar> knots;
 	int _order;
 
 };

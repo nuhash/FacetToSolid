@@ -1,6 +1,6 @@
 #include "BSpline.h"
-template <class T>
-BSpline3D<T>::BSpline3D(int order, int numControlPoints)
+template <class Scalar>
+BSpline3D<Scalar>::BSpline3D(int order, int numControlPoints)
 {
 	if (numControlPoints <= order)
 	{
@@ -26,15 +26,15 @@ BSpline3D<T>::BSpline3D(int order, int numControlPoints)
 			continue;
 		}
 
-		T leftOver = numControlPoints - order + 1;
-		T offset = i - order + 1;
+		Scalar leftOver = numControlPoints - order + 1;
+		Scalar offset = i - order + 1;
 
 		knots.push_back(offset / leftOver);
 	}
 }
 
-template <class T>
-int BSpline3D<T>::KnotSpan(T t) const
+template <class Scalar>
+int BSpline3D<Scalar>::KnotSpan(Scalar t) const
 {
 	int numControlPoints = controlPoints.size();
 	for (size_t i = _order - 1; i <= numControlPoints; i++)
@@ -47,13 +47,13 @@ int BSpline3D<T>::KnotSpan(T t) const
 	return numControlPoints;
 }
 
-template <class T>
-T BSpline3D<T>::BasisFunction(T u, int controlPoint, int degree)
+template <class Scalar>
+Scalar BSpline3D<Scalar>::BasisFunction(Scalar u, int controlPoint, int degree)
 {
 	vector<float> values(degree+1);
 	for (size_t i = 0; i <= degree; i++)
 	{
-		values.push_back((T)((knots[controlPoint + i] <= u && u <= knots[controlPoint + 1 + i])));
+		values.push_back((Scalar)((knots[controlPoint + i] <= u && u <= knots[controlPoint + 1 + i])));
 	}
 
 	for (size_t i = 0; i < degree; i++)
@@ -65,13 +65,13 @@ T BSpline3D<T>::BasisFunction(T u, int controlPoint, int degree)
 		{
 			int currentControlPoint = controlPoint + j;
 
-			T fu = u - knots[currentControlPoint];
-			T fl = (knots[currentControlPoint + currentDegree] - knots[currentControlPoint]) + (T)(knots[currentControlPoint + currentDegree] == knots[currentControlPoint]);
-			T fff = fu / fl;
+			Scalar fu = u - knots[currentControlPoint];
+			Scalar fl = (knots[currentControlPoint + currentDegree] - knots[currentControlPoint]) + (Scalar)(knots[currentControlPoint + currentDegree] == knots[currentControlPoint]);
+			Scalar fff = fu / fl;
 
-			T gu = (knots[currentControlPoint + currentDegree + 1] - u);
-			T gl = (knots[currentControlPoint + currentDegree + 1] - knots[currentControlPoint + 1]) + (T)(knots[currentControlPoint + currentDegree + 1] == knots[currentControlPoint + 1]);
-			T ggg = gu / gl;
+			Scalar gu = (knots[currentControlPoint + currentDegree + 1] - u);
+			Scalar gl = (knots[currentControlPoint + currentDegree + 1] - knots[currentControlPoint + 1]) + (Scalar)(knots[currentControlPoint + currentDegree + 1] == knots[currentControlPoint + 1]);
+			Scalar ggg = gu / gl;
 
 			values[j] = fff*values[j] + ggg*values[j + 1];
 		}
@@ -81,8 +81,8 @@ T BSpline3D<T>::BasisFunction(T u, int controlPoint, int degree)
 	return values[0];
 }
 
-template <class T>
-Vector3d BSpline3D<T>::Sample(T t) const
+template <class Scalar>
+Vector3d BSpline3D<Scalar>::Sample(Scalar t) const
 {
 	Vector3d result(0, 0, 0);
 	for (size_t i = 0; i < controlPoints.size(); i++)
