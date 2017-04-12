@@ -120,7 +120,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\OpenCASCADE7.1.0-vc10-64\opencascade-7.1.0\inc;</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\OpenCASCADE7.1.0-vc10-64\opencascade-7.1.0\inc;D:\Downloads\occview\FacetToSolid\Eigen</IncludePath>
     <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64;C:\OpenCASCADE7.1.0-vc10-64\opencascade-7.1.0\win64\vc10\lib</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -295,6 +295,7 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <SDLCheck>true</SDLCheck>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>_DEBUG;_CRT_SECURE_NO_DEPRECATE=1;_CRT_NON_CONFORMING_SWPRINTFS=1;_SCL_SECURE_NO_WARNINGS=1;__WXMSW__;_UNICODE;_WINDOWS;NOPCH;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -422,18 +423,24 @@
     </Bscmake>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="BSpline.cpp" />
+    <ClCompile Include="FeatureCategorisation.cpp" />
     <ClCompile Include="FeatureExtraction.cpp" />
     <ClCompile Include="FTSApp.cpp" />
     <ClCompile Include="MainFrame.cpp" />
     <ClCompile Include="OCCView.cpp" />
     <ClCompile Include="OCCWindow.cpp" />
+    <ClCompile Include="SurfaceReconstruction.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="BSpline.h" />
+    <ClInclude Include="FeatureCategorisation.h" />
     <ClInclude Include="FeatureExtraction.h" />
     <ClInclude Include="FTSApp.h" />
     <ClInclude Include="MainFrame.h" />
     <ClInclude Include="occview.h" />
     <ClInclude Include="OCCWindow.h" />
+    <ClInclude Include="SurfaceReconstruction.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
