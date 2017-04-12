@@ -8,8 +8,18 @@
 #include <vector>
 #include <tuple>
 #include <set>
+#include <map>
+#include <Eigen/Eigen>
+#include <Eigen/Core>
+#include <BRep_Tool.hxx>
+#include <BRepTools.hxx>
+
+#include <GeomLProp_SLProps.hxx>
+#include <TopTools_ListOfShape.hxx>
+#include <TopoDS.hxx>
 
 using namespace std;
+using namespace Eigen;
 class FeatureExtractionAlgo
 {
 public:
@@ -21,6 +31,11 @@ public:
 	};
 
 	class VerticesSet : public set<TopoDS_Vertex, Shape_Compare>
+	{
+
+	};
+
+	class FacesMap : public std::map<TopoDS_Face, int, Shape_Compare>
 	{
 
 	};
@@ -50,7 +65,11 @@ public:
 	class ExtractedFeature
 	{
 	public:
-		void AddFace(TopoDS_Face face);
+		void AddFace(TopoDS_Face face)
+		{
+			if (!ContainsFace(face))
+				faces.push_back(face);
+		}
 		void AddVertex(TopoDS_Vertex vertex) { vertices.push_back(vertex); }
 		void AddEdgeVertex(TopoDS_Vertex vertex, EdgeVertexType type) { edgeVertices.push_back(vertex); edgeVerticesTypes.push_back(type); }
 		int NumFaces() { return faces.size(); }
@@ -65,6 +84,7 @@ public:
 		bool IsVertexEdge(TopoDS_Vertex vertex);
 		bool IsVertexEdgeProcessed(TopoDS_Vertex vertex);
 		const vector<TopoDS_Face> GetFaces() { return faces; }
+		const vector<TopoDS_Vertex> GetVertices() { return vertices; }
 		int NumEdges() { return extractedEdges.size(); }
 	protected:
 	private:
@@ -82,17 +102,61 @@ public:
 		bool IsVertexProcessed(TopoDS_Vertex vertex);
 		int NumFaces();
 		void ProcessEdges(TopoDS_Shape shape);
+		template<typename Iter>
+		void ExpandFeature(TopoDS_Face face, Iter begin, Iter end)
+		{
+			this->back().AddFace(face);
+			while (begin!=end)
+			{
+				this->back().AddVertex(*begin);
+				begin++;
+			}
+		}
 	protected:
 	private:
 	};
 
+	static double NormalWeight(TopoDS_Face face, TopoDS_Vertex vertex);
 	static ExtractedFeatures NormalTensorFrameworkMethod(TopoDS_Shape model, float creaseAngle = 5.0f);
+	static ExtractedFeatures EdgewiseNormalTensorFrameworkMethod(TopoDS_Shape model, float creaseAngle = 5.0f);
+
+
 
 
 
 protected:
 
 private:
+
+	static double FaceNormalWeight(TopoDS_Face currentFace, TopoDS_Vertex currentVertex);
+	
+	static void CalcNormalTensor(TopTools_ListOfShape &currentFaces, TopoDS_Vertex v, Matrix3d &normalTensorSum, Vector3d &normalSum)
+	{
+		for (auto ite2 = currentFaces.begin(); ite2 != currentFaces.end(); ite2++)
+		{
+			auto f = TopoDS::Face(*ite2);
+			auto currentNormal = FaceNormal(f);
+			auto currentWeight = FaceNormalWeight(f, v);
+			normalTensorSum += currentWeight * currentNormal * currentNormal.transpose();
+			normalSum += currentWeight * currentNormal;
+		}
+	}
+
+	static Vector3d FaceNormal(TopoDS_Face face) 
+	{
+		TopoDS_Face currentFace = face;
+
+		Standard_Real umin, umax, vmin, vmax;
+		BRepTools::UVBounds(currentFace, umin, umax, vmin, vmax);
+
+		auto currentSurface = BRep_Tool::Surface(currentFace);
+
+		GeomLProp_SLProps props(currentSurface, umin, vmin, 1, 0.01);
+		gp_Dir normal = props.Normal();
+
+		return Vector3d(normal.X(), normal.Y(), normal.Z());
+	}
+
 	static bool IsVertexInQueue(vector<TopoDS_Vertex> list, TopoDS_Vertex vertex)
 	{
 		for (size_t i = 0; i < list.size(); i++)
