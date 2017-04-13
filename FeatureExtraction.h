@@ -112,6 +112,15 @@ public:
 				begin++;
 			}
 		}
+		template<typename Iter>
+		void AddEdgeVertices(Iter begin, Iter end, EdgeVertexType type)
+		{
+			while (begin!=end)
+			{
+				this->back().AddEdgeVertex(*begin, type);
+				begin++;
+			}
+		}
 	protected:
 	private:
 	};

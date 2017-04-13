@@ -259,7 +259,7 @@ FeatureExtractionAlgo::ExtractedFeatures FeatureExtractionAlgo::EdgewiseNormalTe
 	TopTools_IndexedDataMapOfShapeListOfShape faceToVertexMap;
 	TopExp::MapShapesAndAncestors(model, TopAbs_FACE, TopAbs_VERTEX, faceToVertexMap);
 	TopTools_IndexedDataMapOfShapeListOfShape faceToEdgeMap;
-	TopExp::MapShapesAndAncestors(model, TopAbs_FACE, TopAbs_EDGE, faceToVertexMap);
+	TopExp::MapShapesAndAncestors(model, TopAbs_FACE, TopAbs_EDGE, faceToEdgeMap);
 	TopTools_IndexedDataMapOfShapeListOfShape vertexToFaceMap;
 	TopExp::MapShapesAndAncestors(model, TopAbs_VERTEX, TopAbs_FACE, vertexToFaceMap);
 	TopTools_IndexedDataMapOfShapeListOfShape edgeToFaceMap;
@@ -277,27 +277,41 @@ FeatureExtractionAlgo::ExtractedFeatures FeatureExtractionAlgo::EdgewiseNormalTe
 	int numProcessed = 0;
 
 	ExtractedFeatures result;
-	result.push_back(ExtractedFeature());
+	//result.push_back(ExtractedFeature());
 
 	stack<TopoDS_Face> faceQueue;
-	faceQueue.push(faces.begin()->first);
-	faces[faceQueue.top()] = 1;
-	while (numProcessed<numFaces)
+	//faceQueue.push(faces.begin()->first);
+	//faces[faceQueue.top()] = 1;
+	while (result.NumFaces()<numFaces)
 	{
+		if (faceQueue.empty())
+		{
+			result.push_back(ExtractedFeature());
+			for (auto kp : faces)
+			{
+				if (kp.second == 0)
+				{
+					faceQueue.push(kp.first);
+					faces[kp.first] = 1;
+					break;
+				}
+			}
+		}
+
 		auto currentFace = faceQueue.top();
 		faceQueue.pop();
 		
 		
 		auto cV = faceToVertexMap.FindFromKey(currentFace);
 		VerticesSet currentVertices;
-		for (auto ite = cV.begin(); ite != cV.end(); ite++)
+		for (topExp.Init(currentFace, TopAbs_VERTEX); topExp.More(); topExp.Next())
 		{
-			currentVertices.insert(TopoDS::Vertex(*ite));
+			currentVertices.insert(TopoDS::Vertex(topExp.Current()));
 		}
 
 		result.ExpandFeature(currentFace, currentVertices.begin(), currentVertices.end());
 		faces[currentFace] = 2;
-		vector<vector<TopoDS_Vertex>> classificationResults = { vector<TopoDS_Vertex>(3), vector<TopoDS_Vertex>(3), vector<TopoDS_Vertex>(3)};
+		vector<vector<TopoDS_Vertex>> classificationResults = { vector<TopoDS_Vertex>(), vector<TopoDS_Vertex>(), vector<TopoDS_Vertex>()};
 
 		for (auto v : currentVertices)
 		{
@@ -330,51 +344,117 @@ FeatureExtractionAlgo::ExtractedFeatures FeatureExtractionAlgo::EdgewiseNormalTe
 			classificationResults[vertexClass].push_back(v);
 		}
 
-		if (classificationResults[1].size()>1 || classificationResults[2].size()>1)
+		if (classificationResults[1].size() > 1 || classificationResults[2].size() > 1)
 		{
 			TopTools_IndexedDataMapOfShapeListOfShape vertexToEdgeMap;
 			TopExp::MapShapesAndAncestors(currentFace, TopAbs_VERTEX, TopAbs_EDGE, vertexToEdgeMap);
-			
-			for (size_t i = 0; i < classificationResults[1].size(); i++)
+#pragma region Crease-crease and corner-corner edge expansion			
+			for (size_t i = 1; i <= 2; i++)
 			{
-				auto v = classificationResults[1][i];
-				auto v2 = classificationResults[1][(i+1)%3];
-				auto currentEdges = vertexToEdgeMap.FindFromKey(v);
-				for (auto e : currentEdges)
+				if (classificationResults[i].size() < 2)
 				{
-					TopoDS_Vertex first;
-					TopoDS_Vertex second;
-					TopExp::Vertices(TopoDS::Edge(e), first, second);
-					if (v2.IsSame(first) || v2.IsSame(second))
+					continue;
+				}
+				int limit;
+				if (classificationResults[i].size() == 2)
+				{
+					limit = 1;
+				}
+				else
+				{
+					limit = 3;
+				}
+				for (size_t j = 0; j < limit; j++)
+				{
+					auto v = classificationResults[i][j];
+					auto v2 = classificationResults[i][(j + 1) % 3];
+					auto currentEdges = vertexToEdgeMap.FindFromKey(v);
+					for (auto e : currentEdges)
 					{
-						auto edgeFaces = edgeToFaceMap.FindFromKey(e);
-						auto face1 = TopoDS::Face(*edgeFaces.begin());
-						auto face2 = TopoDS::Face(*edgeFaces.end());
-						auto n1 = FaceNormal(face1);
-						auto n2 = FaceNormal(face2);
-						n1.normalize();
-						n2.normalize();
-						if (n1.dot(n2) > cos(creaseAngle))
+						TopoDS_Vertex first;
+						TopoDS_Vertex second;
+						TopExp::Vertices(TopoDS::Edge(e), first, second);
+						if (v2.IsSame(first) || v2.IsSame(second))
 						{
-							//expand edge
-							if (faces[face1] == 0)
+							auto edgeFaces = edgeToFaceMap.FindFromKey(e);
+							auto face1 = TopoDS::Face(edgeFaces.First());
+							auto face2 = TopoDS::Face(edgeFaces.Last());
+							auto n1 = FaceNormal(face1);
+							auto n2 = FaceNormal(face2);
+							n1.normalize();
+							n2.normalize();
+							if (n1.dot(n2) > cos(creaseAngle*M_PI/180))
 							{
-								faceQueue.push(face1);
-								faces[face1] = 1;
+								//expand edge
+								if (faces[face1] == 0)
+								{
+									faceQueue.push(face1);
+									faces[face1] = 1;
+								}
+								else if (faces[face2] == 0)
+								{
+									faceQueue.push(face2);
+									faces[face2] = 1;
+								}
 							}
-							else if (faces[face2] == 0)
-							{
-								faceQueue.push(face2);
-								faces[face2] = 1;
-							}
+							break;
 						}
 					}
 				}
 			}
+#pragma endregion
+
+#pragma region Crease-corner edge expansion
+			for (auto v : classificationResults[1])
+			{
+				auto currentEdges = vertexToEdgeMap.FindFromKey(v);
+				for (auto v2 : classificationResults[2])
+				{
+					for (auto e : currentEdges)
+					{
+						TopoDS_Vertex first;
+						TopoDS_Vertex second;
+						TopExp::Vertices(TopoDS::Edge(e), first, second);
+						if (v2.IsSame(first) || v2.IsSame(second))
+						{
+							auto edgeFaces = edgeToFaceMap.FindFromKey(e);
+							auto face1 = TopoDS::Face(edgeFaces.First());
+							auto face2 = TopoDS::Face(edgeFaces.Last());
+							auto n1 = FaceNormal(face1);
+							auto n2 = FaceNormal(face2);
+							n1.normalize();
+							n2.normalize();
+							if (n1.dot(n2) > cos(creaseAngle*M_PI / 180))
+							{
+								//expand edge
+								if (faces[face1] == 0)
+								{
+									faceQueue.push(face1);
+									faces[face1] = 1;
+								}
+								else if (faces[face2] == 0)
+								{
+									faceQueue.push(face2);
+									faces[face2] = 1;
+								}
+							}
+							break;
+						}
+					}
+				}
+			}
+#pragma endregion
+			for (size_t i = 1; i < 3; i++)
+			{
+				result.AddEdgeVertices(classificationResults[i].begin(), classificationResults[i].end(),(EdgeVertexType)i);
+			}
+			
 		}
-		else
+
+		if(classificationResults[0].size()>0)
 		{
-			for (auto v : currentVertices)
+#pragma region Planar vertex expansion
+			for (auto v : classificationResults[0])
 			{
 				TopTools_ListOfShape currentFaces = vertexToFaceMap.FindFromKey(v);
 				for (auto x : currentFaces)
@@ -387,11 +467,11 @@ FeatureExtractionAlgo::ExtractedFeatures FeatureExtractionAlgo::EdgewiseNormalTe
 					}
 				}
 			}
+#pragma endregion
 		}
-
 	}
 
-	return ExtractedFeatures();
+	return result;
 }
 
 double FeatureExtractionAlgo::FaceNormalWeight(TopoDS_Face currentFace, TopoDS_Vertex currentVertex)

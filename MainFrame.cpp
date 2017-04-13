@@ -241,6 +241,15 @@ void MyFrame::OnExtractFeatures(wxCommandEvent& event)
 			featureSel2->AppendString(label);
 		}
 		break;
+	case 1:
+		features = FeatureExtractionAlgo::EdgewiseNormalTensorFrameworkMethod(occView->GetCurrentShape());
+		for (size_t i = 0; i < features.size(); i++)
+		{
+			wxString label = wxString::Format(wxT("Faces:%i;Edges:%i"), features.at(i).NumFaces(), features.at(i).NumEdges());
+			featureSel->AppendString(label);
+			featureSel2->AppendString(label);
+		}
+		break;
 	default:
 		break;
 	}
