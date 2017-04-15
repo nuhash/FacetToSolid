@@ -92,9 +92,9 @@ namespace FeatureExtractionAlgo
 		bool ContainsVertex(TopoDS_Vertex vertex);
 		TopoDS_Face GetFace(int n) { return faces[n]; };
 		TopoDS_Vertex GetNearbyEdgeVertex(TopoDS_Shape shape, TopoDS_Vertex vertex);
-		void ProcessEdges(TopoDS_Shape shape);
+		void ProcessEdges();
 		int FindCornerVertex();
-		bool CreateNewEdge(vector<ExtractedFeatureEdge>& queue, TopTools_IndexedDataMapOfShapeListOfShape v2e, TopoDS_Vertex &vertex, EdgeVertexType &type);
+		bool CreateNewEdge(vector<ExtractedFeatureEdge>& queue, TopTools_IndexedDataMapOfShapeListOfShape v2e, TopTools_IndexedDataMapOfShapeListOfShape e2f, TopoDS_Vertex &vertex, EdgeVertexType &type);
 		int FindEdgeVertex(TopoDS_Vertex vertex);
 		bool IsVertexEdge(TopoDS_Vertex vertex);
 		bool IsVertexEdgeProcessed(TopoDS_Vertex vertex);
