@@ -17,13 +17,26 @@
 #include <GeomLProp_SLProps.hxx>
 #include <TopTools_ListOfShape.hxx>
 #include <TopoDS.hxx>
+#include <TopExp.hxx>
 
 using namespace std;
 using namespace Eigen;
-class FeatureExtractionAlgo
+namespace FeatureExtractionAlgo
 {
-public:
-	
+//public:
+	struct ConversionHelpers {
+		Vector3d operator()(const TopoDS_Vertex& v) const
+		{
+			auto p = BRep_Tool::Pnt(v);
+			return Vector3d(p.X(), p.Y(), p.Z());
+		}
+
+
+		
+	};
+
+	Vector3d operator|(const TopoDS_Vertex v, ConversionHelpers c);
+	const ConversionHelpers converter;
 	struct Shape_Compare {
 		bool operator() (const TopoDS_Shape& lhs, const TopoDS_Shape& rhs) const {
 			return lhs.HashCode(1<<30)<rhs.HashCode(1<<30);
@@ -39,6 +52,8 @@ public:
 	{
 
 	};
+
+	class FacesSet : public std::set<TopoDS_Face, Shape_Compare> {};
 
 	enum EdgeVertexType
 	{
@@ -125,69 +140,19 @@ public:
 	private:
 	};
 
-	static double NormalWeight(TopoDS_Face face, TopoDS_Vertex vertex);
-	static ExtractedFeatures NormalTensorFrameworkMethod(TopoDS_Shape model, float creaseAngle = 5.0f);
-	static ExtractedFeatures EdgewiseNormalTensorFrameworkMethod(TopoDS_Shape model, float creaseAngle = 5.0f);
+	//static double NormalWeight(TopoDS_Face face, TopoDS_Vertex vertex);
+	ExtractedFeatures NormalTensorFrameworkMethod(TopoDS_Shape model, float creaseAngle = 5.0f);
+	ExtractedFeatures EdgewiseNormalTensorFrameworkMethod(TopoDS_Shape model, float creaseAngle = 5.0f);
 
-
-
-
-
-protected:
-
-private:
-
-	static double FaceNormalWeight(TopoDS_Face currentFace, TopoDS_Vertex currentVertex);
+	double FaceNormalWeightMWSLER(TopoDS_Face currentFace, TopoDS_Vertex currentVertex);
 	
-	static void CalcNormalTensor(TopTools_ListOfShape &currentFaces, TopoDS_Vertex v, Matrix3d &normalTensorSum, Vector3d &normalSum)
-	{
-		for (auto ite2 = currentFaces.begin(); ite2 != currentFaces.end(); ite2++)
-		{
-			auto f = TopoDS::Face(*ite2);
-			auto currentNormal = FaceNormal(f);
-			auto currentWeight = FaceNormalWeight(f, v);
-			normalTensorSum += currentWeight * currentNormal * currentNormal.transpose();
-			normalSum += currentWeight * currentNormal;
-		}
-	}
+	Vector3d FaceNormal(TopoDS_Face face);
 
-	static Vector3d FaceNormal(TopoDS_Face face) 
-	{
-		TopoDS_Face currentFace = face;
+	template<typename List>
+	void CalcNormalTensor(List &currentFaces, TopoDS_Vertex v, Matrix3d &normalTensorSum, Vector3d &normalSum);
 
-		Standard_Real umin, umax, vmin, vmax;
-		BRepTools::UVBounds(currentFace, umin, umax, vmin, vmax);
+	bool IsVertexInQueue(vector<TopoDS_Vertex> list, TopoDS_Vertex vertex);
 
-		auto currentSurface = BRep_Tool::Surface(currentFace);
+	int FindVertex(vector<TopoDS_Vertex> list, TopoDS_Vertex vertex);
 
-		GeomLProp_SLProps props(currentSurface, umin, vmin, 1, 0.01);
-		gp_Dir normal = props.Normal();
-
-		return Vector3d(normal.X(), normal.Y(), normal.Z());
-	}
-
-	static bool IsVertexInQueue(vector<TopoDS_Vertex> list, TopoDS_Vertex vertex)
-	{
-		for (size_t i = 0; i < list.size(); i++)
-		{
-			if (vertex.IsSame(list[i]))
-			{
-				return true;
-			}
-		}
-		return false;
-	}
-
-	static int FindVertex(vector<TopoDS_Vertex> list, TopoDS_Vertex vertex)
-	{
-		int i;
-		for (i = 0; i < list.size(); i++)
-		{
-			if (vertex.IsSame(list[i]))
-			{
-				return i;
-			}
-		}
-		return -1;
-	}
 };
