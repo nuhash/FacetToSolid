@@ -499,7 +499,7 @@ namespace FeatureExtractionAlgo {
 #pragma endregion
 			}
 		}
-
+		result.ProcessEdges();
 		return result;
 	}
 
@@ -659,8 +659,8 @@ namespace FeatureExtractionAlgo {
 		return result;
 	}
 
-	void ExtractedFeatures::ProcessEdges(TopoDS_Shape shape)
-	{
+	void ExtractedFeatures::ProcessEdges()
+{
 		for (size_t i = 0; i < size(); i++)
 		{
 			at(i).ProcessEdges();
@@ -718,117 +718,90 @@ namespace FeatureExtractionAlgo {
 		map<int, ExtractedFeatureEdge> edgeMap;
 		stack<int> edgeQueue;
 		int cornerCount = 0;
-		int posFirstCorner = -1;
-		for (size_t i = 0; i < edgeVertices.size(); i++)
+
+		for (auto e:edgeVertices)
 		{
-			edgeVertexMap.insert({ edgeVertices[i],{edgeVerticesTypes[i],-1} });
-			if (edgeVerticesTypes[i]==CORNER)
+			edgeVertexMap.insert({ e.first,{e.second,-1} });
+			if (e.second==CORNER)
 			{
 				cornerCount++;
-				if (cornerCount == 0)
-				{
-					posFirstCorner = i;
-				}
 			}
 		}
 
-		auto createEdge = [](TopoDS_Vertex vertex, TopoDS_Edge edge, EdgeType type, map<TopoDS_Vertex, pair<EdgeVertexType, int>, Shape_Compare> &edgeVertexMap, map<int, ExtractedFeatureEdge> &edgeMap, stack<int> &edgeQueue, int &num) {
-			TopoDS_Vertex first, second, v;
-			TopExp::Vertices(edge, first, second);
-			if (vertex.IsSame(first))
-			{
-				v = second;
-			}
-			else
-			{
-				v = first;
-			}
-			ExtractedFeatureEdge newEdge;
-			newEdge.Type(type);
-			newEdge.AddVertex(vertex);
-			newEdge.AddVertex(v);
-			edgeVertexMap[vertex].second = edgeMap.size();
-			edgeVertexMap[v].second = edgeMap.size();
-			edgeQueue.push(edgeMap.size());
-			edgeMap.insert({ edgeMap.size(),newEdge });
-			num++;
-		};
-		
 		int numProcessed = 0;
-		if (posFirstCorner==-1)
-		{
-			auto creaseVertex = edgeVertices[0];
-			auto edges = vertexToEdgeMap.FindFromKey(creaseVertex);
-			for (auto e:edges)
-			{
-				auto edge = TopoDS::Edge(e);
-				auto faces = edgeToFaceMap.FindFromKey(edge);
-				if (faces.Size() == 1)
-				{
-					numProcessed++;
-					createEdge(creaseVertex, edge, CONTINUOUS, edgeVertexMap, edgeMap, edgeQueue, numProcessed);
-					//TopoDS_Vertex first, second, v;
-					//TopExp::Vertices(edge, first, second);
-					//if (creaseVertex.IsSame(first))
-					//{
-					//	v = second;
-					//}
-					//else
-					//{
-					//	v = first;
-					//}
-					//ExtractedFeatureEdge newEdge;
-					//newEdge.Type(FINITE);
-					//newEdge.AddVertex(creaseVertex);
-					//newEdge.AddVertex(v);
-					//edgeVertexMap[creaseVertex].second = edgeMap.size();
-					//edgeVertexMap[v].second = edgeMap.size();
-					//edgeQueue.push(edgeMap.size());
-					//edgeMap.insert({ edgeMap.size(),newEdge });
-				}
-			}
-		} 
-		else
-		{
-			auto cornerVertex = edgeVertices[posFirstCorner];
-			auto edges = vertexToEdgeMap.FindFromKey(cornerVertex);
-			for (auto e : edges)
-			{
-				auto edge = TopoDS::Edge(e);
-				auto faces = edgeToFaceMap.FindFromKey(edge);
-				if (faces.Size()==1)
-				{
-					numProcessed++;
-					createEdge(cornerVertex, edge, FINITE, edgeVertexMap, edgeMap, edgeQueue, numProcessed);
-					//TopoDS_Vertex first, second, v;
-					//TopExp::Vertices(edge, first, second);
-					//if (cornerVertex.IsSame(first))
-					//{
-					//	v = second;
-					//}
-					//else
-					//{
-					//	v = first;
-					//}
-					//ExtractedFeatureEdge newEdge;
-					//newEdge.Type(FINITE);
-					//newEdge.AddVertex(cornerVertex);
-					//newEdge.AddVertex(v);
-					//edgeVertexMap[cornerVertex].second = edgeMap.size();
-					//edgeVertexMap[v].second = edgeMap.size();
-					//edgeQueue.push(edgeMap.size());
-					//edgeMap.insert({ edgeMap.size(),newEdge });
-				}
-			}
-		}
-		auto queueNum = edgeQueue.top();
-		auto &currentEdge = edgeMap[queueNum];
+		
 		while (numProcessed<edgeVertices.size())
 		{
-			auto queueNum = edgeQueue.top();
-			if (edgeMap.)
+#pragma region Queue populate
+			if (edgeQueue.empty())
 			{
+				bool posFirstCorner = false;// = FindCornerVertex();
+				EdgeType type;TopoDS_Vertex vertex;
+				for (auto p : edgeVertexMap)
+				{
+					if (p.second.first == CORNER && p.second.second ==-1)
+					{
+						posFirstCorner = true;
+						vertex = p.first;
+						type = FINITE;
+						break;
+					}
+				}
+				
+				
+				if (!posFirstCorner)
+				{
+					//vertex = edgeVertices[0];
+					for (auto e : edgeVertexMap)
+					{
+						if (e.second.second==-1)
+						{
+							vertex = e.first;
+							break;
+						}
+					}
+					type = CONTINUOUS;
+				}
+				//else
+				//{
+				//	vertex = edgeVertices[posFirstCorner];
+				//	type = FINITE;
+				//}
+				
+				//verticesToProcess
+				vector<TopoDS_Vertex> verticesToProcess = { vertex };
+				//while there are vertices to process
+				while (verticesToProcess.size()>0)
+				{
+					auto vertex = verticesToProcess.back();
+					verticesToProcess.pop_back();
+					auto edges = vertexToEdgeMap.FindFromKey(vertex);
+					numProcessed++;
+					for (auto e : edges)
+					{
+						auto edge = TopoDS::Edge(e);
+						auto faces = edgeToFaceMap.FindFromKey(edge);
+						if (faces.Size() == 1)
+						{
+							//if corner add to vertices to process
+
+							CreateEdge(vertex, edge, type, edgeVertexMap, edgeMap, edgeQueue, numProcessed, verticesToProcess);
+						}
+					}
+				}
+				if (edgeQueue.empty())
+				{
+					continue;
+				}
 			}
+#pragma endregion
+			auto queueNum = edgeQueue.top();
+			if (edgeMap.count(queueNum)==0)
+			{
+				edgeQueue.pop();
+				continue;
+			}
+			auto &currentEdge = edgeMap[queueNum];
 			auto currentVertex = currentEdge.back();
 			auto edges = vertexToEdgeMap.FindFromKey(currentVertex);
 			for (auto e:edges)
@@ -847,140 +820,145 @@ namespace FeatureExtractionAlgo {
 					{
 						v = first;
 					}
-					if (v.IsSame(*(currentEdge.rbegin()++)))
+					auto prevVertex = currentEdge[currentEdge.size() - 2];
+					if (v.IsSame(prevVertex))//If the edge is going backwards along the extracted edge
 					{
 						continue;
 					}
-					if (currentEdge.Type() == CONTINUOUS && v.IsSame(currentEdge.front()))
+					if (currentEdge.Type() == CONTINUOUS && v.IsSame(currentEdge.front()))//If the edge completes a loop
 					{
-						//Edge complete
-						//Find new edge
+						edgeQueue.pop();
+						break;
 					}
 					if (edgeVertexMap[v].second!=-1) //Next vertex is already in an extracted edge
 					{
 						int edgePos = edgeVertexMap[v].second;
 						auto &oldEdge = edgeMap[edgePos];
-						for (auto ov:oldEdge)
+						for (auto ite = oldEdge.rbegin(); ite != oldEdge.rend(); ite++)
 						{
+							auto ov = *ite;
 							currentEdge.AddVertex(ov);
 							edgeVertexMap[ov].second = queueNum;
 						}
 						edgeMap.erase(edgePos);
+						edgeQueue.pop();
+						continue;
 					}
+					if (edgeVertexMap[v].first==CORNER)
+					{
+						vector<TopoDS_Vertex> verticesToProcess = { v };
+						while (verticesToProcess.size()>0)
+						{
+							auto v = verticesToProcess.back();
+							verticesToProcess.pop_back();
+							auto edges = vertexToEdgeMap.FindFromKey(v);
+							//numProcessed++;
+							for (auto e : edges)
+							{
+								auto edge = TopoDS::Edge(e);
+								auto faces = edgeToFaceMap.FindFromKey(edge);
+								if (faces.Size() == 1)
+								{
+									CreateEdge(v, edge, FINITE, edgeVertexMap, edgeMap, edgeQueue, numProcessed, verticesToProcess);
+								}
+							}
+						}
+						edgeQueue.pop();
+					}
+					currentEdge.AddVertex(v);
+					edgeVertexMap[v].second = queueNum; 
+					numProcessed++;
+					break;
 				}
 			}
 		}
-
-	}
-
-	int ExtractedFeature::FindCornerVertex()
-	{
-		int i;
-		for (i = 0; i < edgeVerticesTypes.size(); i++)
+		for (auto e : edgeMap)
 		{
-			if (edgeVerticesTypes[i] == EdgeVertexType::CORNER)
-			{
-				return i;
-			}
+			extractedEdges.push_back(e.second);
 		}
-		return -1; //No corner found, continuous edge/s
 	}
 
-	bool ExtractedFeature::CreateNewEdge(vector<ExtractedFeatureEdge>& queue, TopTools_IndexedDataMapOfShapeListOfShape v2e, TopTools_IndexedDataMapOfShapeListOfShape e2f, TopoDS_Vertex &vertex, EdgeVertexType &type)
-	{
-		if (edgeVertices.size() == 0)
-			return false;
-		//extractedEdges.push_back(ExtractedFeatureEdge());
+	//int ExtractedFeature::FindCornerVertex()
+	//{
+	//	int i;
+	//	for (i = 0; i < edgeVerticesTypes.size(); i++)
+	//	{
+	//		if (edgeVerticesTypes[i] == EdgeVertexType::CORNER)
+	//		{
+	//			return i;
+	//		}
+	//	}
+	//	return -1; //No corner found, continuous edge/s
+	//}
 
-		int cornerPos = FindCornerVertex();
-		if (cornerPos == -1) //Continuous edge/s
+	void ExtractedFeature::CreateEdge(TopoDS_Vertex vertex, TopoDS_Edge edge, EdgeType type, map<TopoDS_Vertex, pair<EdgeVertexType, int>, Shape_Compare> &edgeVertexMap, map<int, ExtractedFeatureEdge> &edgeMap, stack<int> &edgeQueue, int &numProcessed, vector<TopoDS_Vertex> &verticesToProcess) {
+		TopoDS_Vertex first, second, v;
+		TopExp::Vertices(edge, first, second);
+		if (vertex.IsSame(first))
 		{
-			ExtractedFeatureEdge newEdge;
-			newEdge.Type(CONTINUOUS);
-			newEdge.AddVertex(edgeVertices.back());
-			vertex = edgeVertices.back();
-			edgeVertices.pop_back();
-			type = edgeVerticesTypes.back();
-			edgeVerticesTypes.pop_back();
-			queue.push_back(newEdge);
+			v = second;
 		}
 		else
 		{
-			auto currentVertex = edgeVertices.at(cornerPos);
-			vertex = currentVertex;
-			type = edgeVerticesTypes.at(cornerPos);
-			edgeVertices.erase(edgeVertices.begin() + cornerPos);
-			edgeVerticesTypes.erase(edgeVerticesTypes.begin() + cornerPos);
-
-			TopoDS_Vertex first, second;
-
-			auto edges = v2e.FindFromKey(currentVertex);
-			for (auto ite = edges.begin(); ite != edges.end(); ite++)
-			{
-				auto currentEdge = TopoDS::Edge(*ite);
-				TopExp::Vertices(currentEdge, first, second);
-				TopoDS_Vertex v;
-				if (!currentVertex.IsSame(first))
-				{
-					v = first;
-				}
-				else
-					//			if(!currentVertex.IsSame(second))
-				{
-					v = second;
-				}
-				auto faces = e2f.FindFromKey(currentEdge);
-				if (faces.Size()==1)//Ignore faces that cut across the feature
-				{
-					ExtractedFeatureEdge newEdge;
-					newEdge.Type(FINITE);
-					newEdge.AddVertex(currentVertex);
-					newEdge.AddVertex(v);
-					queue.push_back(newEdge);
-					int pos = FindEdgeVertex(v);
-					edgeVertices.erase(edgeVertices.begin() + pos);
-					edgeVerticesTypes.erase(edgeVerticesTypes.begin() + pos);
-				}
-			}
+			v = first;
 		}
-		return true;
-	}
-
-	int ExtractedFeature::FindEdgeVertex(TopoDS_Vertex vertex)
-	{
-		int i;
-		for (i = 0; i < edgeVerticesTypes.size(); i++)
+		
+		if (edgeVertexMap[v].second == -1 || FindVertex(verticesToProcess,v)>-1)
 		{
-			if (vertex.IsSame(edgeVertices[i]))
+			ExtractedFeatureEdge newEdge;
+			newEdge.Type(type);
+			newEdge.AddVertex(vertex);
+			newEdge.AddVertex(v);
+			edgeVertexMap[vertex].second = edgeMap.size();
+			edgeVertexMap[v].second = edgeMap.size();
+			if (edgeVertexMap[v].first!=CORNER)
 			{
-				return i;
+				edgeQueue.push(edgeMap.size());
 			}
+			else
+			{
+				verticesToProcess.push_back(v);
+			}
+			edgeMap.insert({ edgeMap.size(),newEdge });
+			numProcessed++;
 		}
-		return -1;
 	}
 
-	bool ExtractedFeature::IsVertexEdge(TopoDS_Vertex vertex)
-	{
-		for (size_t i = 0; i < edgeVertices.size(); i++)
-		{
-			if (vertex.IsSame(edgeVertices[i]))
-			{
-				return true;
-			}
-		}
-		return false;
-	}
+	//int ExtractedFeature::FindEdgeVertex(TopoDS_Vertex vertex)
+	//{
+	//	int i;
+	//	for (i = 0; i < edgeVerticesTypes.size(); i++)
+	//	{
+	//		if (vertex.IsSame(edgeVertices[i]))
+	//		{
+	//			return i;
+	//		}
+	//	}
+	//	return -1;
+	//}
 
-	bool ExtractedFeature::IsVertexEdgeProcessed(TopoDS_Vertex vertex)
-	{
-		for (size_t i = 0; i < extractedEdges.size(); i++)
-		{
-			for (size_t j = 0; j < extractedEdges[i].size(); j++)
-			{
-				if (vertex.IsSame(extractedEdges[i][j]))
-					return true;
-			}
-		}
-		return false;
-	}
+	//bool ExtractedFeature::IsVertexEdge(TopoDS_Vertex vertex)
+	//{
+	//	for (size_t i = 0; i < edgeVertices.size(); i++)
+	//	{
+	//		if (vertex.IsSame(edgeVertices[i]))
+	//		{
+	//			return true;
+	//		}
+	//	}
+	//	return false;
+	//}
+
+	//bool ExtractedFeature::IsVertexEdgeProcessed(TopoDS_Vertex vertex)
+	//{
+	//	for (size_t i = 0; i < extractedEdges.size(); i++)
+	//	{
+	//		for (size_t j = 0; j < extractedEdges[i].size(); j++)
+	//		{
+	//			if (vertex.IsSame(extractedEdges[i][j]))
+	//				return true;
+	//		}
+	//	}
+	//	return false;
+	//}
 }
