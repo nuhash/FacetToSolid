@@ -96,6 +96,7 @@ namespace FeatureExtractionAlgo
 		void ProcessEdges();
 		int FindCornerVertex();
 		void CreateEdge(TopoDS_Vertex vertex, TopoDS_Edge edge, EdgeType type, map<TopoDS_Vertex, pair<EdgeVertexType, int>, Shape_Compare> &edgeVertexMap, map<int, ExtractedFeatureEdge> &edgeMap, stack<int> &edgeQueue, int &numProcessed, vector<TopoDS_Vertex> &verticesToProcess);
+		void ProcessEdgeGroups();
 		//bool CreateNewEdge(vector<ExtractedFeatureEdge>& queue, TopTools_IndexedDataMapOfShapeListOfShape v2e, TopTools_IndexedDataMapOfShapeListOfShape e2f, TopoDS_Vertex &vertex, EdgeVertexType &type);
 		int FindEdgeVertex(TopoDS_Vertex vertex);
 		bool IsVertexEdge(TopoDS_Vertex vertex);
@@ -103,6 +104,7 @@ namespace FeatureExtractionAlgo
 		const vector<TopoDS_Face> GetFaces() { return faces; }
 		const vector<TopoDS_Vertex> GetVertices() { return vertices; }
 		int NumEdges() { return extractedEdges.size(); }
+		int NumEdgeGroups() { return edgeGroups.size(); }
 	protected:
 	private:
 		vector<TopoDS_Face> faces;
@@ -110,6 +112,7 @@ namespace FeatureExtractionAlgo
 		map<TopoDS_Vertex,EdgeVertexType, Shape_Compare> edgeVertices;
 		vector<EdgeVertexType> edgeVerticesTypes;
 		vector<ExtractedFeatureEdge> extractedEdges;
+		vector<vector<ExtractedFeatureEdge>> edgeGroups;
 	};
 
 	class ExtractedFeatures : public vector<ExtractedFeature>
