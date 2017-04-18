@@ -19,6 +19,8 @@
 #include <TopTools_ListOfShape.hxx>
 #include <TopoDS.hxx>
 #include <TopExp.hxx>
+#include <queue>
+#include <unordered_map>
 
 using namespace std;
 using namespace Eigen;
@@ -35,7 +37,12 @@ namespace FeatureExtractionAlgo
 
 		
 	};
-
+	enum EdgeVertexType
+	{
+		PLANAR = 0,
+		CREASE = 1,
+		CORNER = 2
+	};
 	Vector3d operator|(const TopoDS_Vertex v, ConversionHelpers c);
 	const ConversionHelpers converter;
 	struct Shape_Compare {
@@ -49,6 +56,11 @@ namespace FeatureExtractionAlgo
 
 	};
 
+	class VerticesMap : public map<TopoDS_Vertex, EdgeVertexType, Shape_Compare>
+	{
+
+	};
+
 	class FacesMap : public std::map<TopoDS_Face, int, Shape_Compare>
 	{
 
@@ -56,11 +68,7 @@ namespace FeatureExtractionAlgo
 
 	class FacesSet : public std::set<TopoDS_Face, Shape_Compare> {};
 
-	enum EdgeVertexType
-	{
-		CREASE = 1,
-		CORNER = 2
-	};
+
 	enum EdgeType
 	{
 		CONTINUOUS,
@@ -95,7 +103,7 @@ namespace FeatureExtractionAlgo
 		TopoDS_Vertex GetNearbyEdgeVertex(TopoDS_Shape shape, TopoDS_Vertex vertex);
 		void ProcessEdges();
 		int FindCornerVertex();
-		void CreateEdge(TopoDS_Vertex vertex, TopoDS_Edge edge, EdgeType type, map<TopoDS_Vertex, pair<EdgeVertexType, int>, Shape_Compare> &edgeVertexMap, map<int, ExtractedFeatureEdge> &edgeMap, stack<int> &edgeQueue, int &numProcessed, vector<TopoDS_Vertex> &verticesToProcess);
+		void CreateEdge(TopoDS_Vertex vertex, TopoDS_Edge edge, EdgeType type, map<TopoDS_Vertex, pair<EdgeVertexType, int>, Shape_Compare> &edgeVertexMap, map<int, ExtractedFeatureEdge> &edgeMap, queue<int> &edgeQueue, int &numProcessed, vector<TopoDS_Vertex> &verticesToProcess);
 		void ProcessEdgeGroups();
 		//bool CreateNewEdge(vector<ExtractedFeatureEdge>& queue, TopTools_IndexedDataMapOfShapeListOfShape v2e, TopTools_IndexedDataMapOfShapeListOfShape e2f, TopoDS_Vertex &vertex, EdgeVertexType &type);
 		int FindEdgeVertex(TopoDS_Vertex vertex);

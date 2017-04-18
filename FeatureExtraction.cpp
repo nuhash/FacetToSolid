@@ -17,6 +17,7 @@
 #include <stack>
 #include <TopoDS_Compound.hxx>
 #include <TopoDS_Builder.hxx>
+#include <queue>
 
 using namespace Eigen;
 
@@ -615,7 +616,7 @@ namespace FeatureExtractionAlgo {
 
 		map<TopoDS_Vertex, pair<EdgeVertexType, int>,Shape_Compare> edgeVertexMap;
 		map<int, ExtractedFeatureEdge> edgeMap;
-		stack<int> edgeQueue;
+		queue<int> edgeQueue;
 		int cornerCount = 0;
 
 		for (auto e:edgeVertices)
@@ -695,7 +696,7 @@ namespace FeatureExtractionAlgo {
 				}
 			}
 #pragma endregion
-			auto queueNum = edgeQueue.top();
+			auto queueNum = edgeQueue.front();
 			if (edgeMap.count(queueNum)==0)
 			{
 				edgeQueue.pop();
@@ -730,7 +731,7 @@ namespace FeatureExtractionAlgo {
 						edgeQueue.pop();
 						break;
 					}
-					if (edgeVertexMap[v].second!=-1) //Next vertex is already in an extracted edge
+					if (edgeVertexMap[v].second!=-1 && edgeVertexMap[v].first == CREASE) //Next vertex is already in an extracted edge
 					{
 						int edgePos = edgeVertexMap[v].second;
 						auto oldEdge = edgeMap[edgePos];
@@ -779,7 +780,7 @@ namespace FeatureExtractionAlgo {
 		ProcessEdgeGroups();
 	}
 
-	void ExtractedFeature::CreateEdge(TopoDS_Vertex vertex, TopoDS_Edge edge, EdgeType type, map<TopoDS_Vertex, pair<EdgeVertexType, int>, Shape_Compare> &edgeVertexMap, map<int, ExtractedFeatureEdge> &edgeMap, stack<int> &edgeQueue, int &numProcessed, vector<TopoDS_Vertex> &verticesToProcess) {
+	void ExtractedFeature::CreateEdge(TopoDS_Vertex vertex, TopoDS_Edge edge, EdgeType type, map<TopoDS_Vertex, pair<EdgeVertexType, int>, Shape_Compare> &edgeVertexMap, map<int, ExtractedFeatureEdge> &edgeMap, queue<int> &edgeQueue, int &numProcessed, vector<TopoDS_Vertex> &verticesToProcess) {
 		
 		if (edgeVertexMap[vertex].second != -1 && type == CONTINUOUS)
 			return;
