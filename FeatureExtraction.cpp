@@ -176,7 +176,7 @@ namespace FeatureExtractionAlgo {
 		return features;
 	}
 
-	ExtractedFeatures EdgewiseNormalTensorFrameworkMethod(TopoDS_Shape model, float creaseAngle /*= 5.0f*/)
+	ExtractedFeatures HybridEdgewiseNormalTensorFrameworkMethod(TopoDS_Shape model, float creaseAngle /*= 5.0f*/)
 	{
 		freopen("output.txt", "w", stdout);
 		TopTools_IndexedDataMapOfShapeListOfShape faceToVertexMap;
@@ -189,12 +189,83 @@ namespace FeatureExtractionAlgo {
 		TopExp::MapShapesAndAncestors(model, TopAbs_EDGE, TopAbs_FACE, edgeToFaceMap);
 		double creaseParameter = 5;// 1 / (tan(0.5*creaseAngle)*tan(0.5*creaseAngle)) - 1;
 		TopExp_Explorer topExp;
-		FacesMap faces;
+		FacesMap<int> faces;
 
 		for (topExp.Init(model, TopAbs_FACE); topExp.More(); topExp.Next())
 		{
 			faces.insert({ TopoDS::Face(topExp.Current()), 0 });
 		}
+
+		map<TopoDS_Edge, bool, Shape_Compare> edgeMap;
+
+		double cosCreaseAngle = cos(creaseAngle*M_PI / 180);
+
+		for (topExp.Init(model, TopAbs_EDGE); topExp.More(); topExp.Next())
+		{
+			auto edge = TopoDS::Edge(topExp.Current());
+
+			auto faces = edgeToFaceMap.FindFromKey(edge);
+
+			if (faces.Size() != 2)
+			{
+				throw; //Shouldn't be possible
+			}
+
+			auto n1 = FaceNormal(TopoDS::Face(faces.First()));
+			auto n2 = FaceNormal(TopoDS::Face(faces.Last()));
+			n1.normalize();
+			n2.normalize();
+			auto dotProduct = n1.dot(n2);
+
+			bool val = dotProduct < cosCreaseAngle;
+
+			edgeMap.insert({ edge,val });
+		}
+
+		VerticesTypeMap vertMap;
+
+		for (topExp.Init(model, TopAbs_VERTEX); topExp.More(); topExp.Next())
+		{
+			auto v = TopoDS::Vertex(topExp.Current());
+			if (vertMap.count(v) == 1)
+			{
+				continue;
+			}
+			TopTools_ListOfShape cF = vertexToFaceMap.FindFromKey(v);
+			FacesSet currentFaces;
+			for (auto f : cF)
+			{
+				currentFaces.insert(TopoDS::Face(f));
+			}
+			Matrix3d normalTensorSum;
+			normalTensorSum << 0, 0, 0,
+				0, 0, 0,
+				0, 0, 0;
+			Vector3d normalSum(0, 0, 0);
+			auto x = converter(v);
+			CalcNormalTensor(currentFaces, v, normalTensorSum, normalSum);
+
+			EigenSolver<Matrix3d> normalTensorSolver(normalTensorSum, true);
+			Matrix3d eigenVectors = normalTensorSolver.eigenvectors().real();
+			Vector3d eigenValues = normalTensorSolver.eigenvalues().real();
+			vector<pair<double, Vector3d>> eigenResults;
+			for (size_t i = 0; i < 3; i++)
+			{
+				eigenResults.push_back({ eigenValues[i],eigenVectors.col(i) });
+			}
+
+			std::sort(eigenResults.begin(), eigenResults.end(), [](pair<double, Vector3d> &left, pair<double, Vector3d> &right) {
+				return left.first > right.first;
+			});
+			Vector3d vertexClassification(eigenResults[0].first - eigenResults[1].first,
+				creaseParameter * (eigenResults[1].first - eigenResults[2].first),
+				creaseParameter * eigenResults[2].first);
+			Vector3d::Index vertexClass;
+			vertexClassification.maxCoeff(&vertexClass);
+			vertMap[v] = (EdgeVertexType)vertexClass;
+			cout << converter(v) << "\n" << vertexClass << "\n\n";
+		}
+
 
 		int numFaces = faces.size();
 		int numProcessed = 0;
@@ -225,7 +296,7 @@ namespace FeatureExtractionAlgo {
 			faceQueue.pop();
 
 
-			auto cV = faceToVertexMap.FindFromKey(currentFace);
+			//auto cV = faceToVertexMap.FindFromKey(currentFace);
 			VerticesSet currentVertices;
 			for (topExp.Init(currentFace, TopAbs_VERTEX); topExp.More(); topExp.Next())
 			{
@@ -238,45 +309,12 @@ namespace FeatureExtractionAlgo {
 
 			for (auto v : currentVertices)
 			{
-				//auto v = TopoDS::Vertex(*ite);
-				TopTools_ListOfShape cF = vertexToFaceMap.FindFromKey(v);
-				FacesSet currentFaces;
-				for (auto f: cF)
-				{
-					currentFaces.insert(TopoDS::Face(f));
-				}
-				Matrix3d normalTensorSum;
-				normalTensorSum << 0, 0, 0,
-					0, 0, 0,
-					0, 0, 0;
-				Vector3d normalSum(0, 0, 0);
-				auto x = converter(v);
-				CalcNormalTensor(currentFaces, v, normalTensorSum, normalSum);
-
-				EigenSolver<Matrix3d> normalTensorSolver(normalTensorSum, true);
-				Matrix3d eigenVectors = normalTensorSolver.eigenvectors().real();
-				Vector3d eigenValues = normalTensorSolver.eigenvalues().real();
-				vector<pair<double, Vector3d>> eigenResults;
-				for (size_t i = 0; i < 3; i++)
-				{
-					eigenResults.push_back({ eigenValues[i],eigenVectors.col(i) });
-				}
-
-				std::sort(eigenResults.begin(), eigenResults.end(), [](pair<double, Vector3d> &left, pair<double, Vector3d> &right) {
-					return left.first > right.first;
-				});
-				Vector3d vertexClassification(eigenResults[0].first - eigenResults[1].first,
-					creaseParameter * (eigenResults[1].first - eigenResults[2].first),
-					creaseParameter * eigenResults[2].first);
-				Vector3d::Index vertexClass;
-				vertexClassification.maxCoeff(&vertexClass);
-				classificationResults[vertexClass].push_back(v);
+				classificationResults[vertMap[v]].push_back(v);
 			}
-
-			if (classificationResults[1].size() > 1 || classificationResults[2].size() > 1)
-			{
 				TopTools_IndexedDataMapOfShapeListOfShape vertexToEdgeMap;
 				TopExp::MapShapesAndAncestors(currentFace, TopAbs_VERTEX, TopAbs_EDGE, vertexToEdgeMap);
+			if (classificationResults[1].size() > 1 || classificationResults[2].size() > 1)
+			{
 #pragma region Crease-crease and corner-corner edge expansion			
 				for (size_t i = 1; i <= 2; i++)
 				{
@@ -297,33 +335,23 @@ namespace FeatureExtractionAlgo {
 					{
 						auto v = classificationResults[i][j];
 						auto v2 = classificationResults[i][(j + 1) % 3];
-						auto currentEdges = vertexToEdgeMap.FindFromKey(v);
-						for (auto e : currentEdges)
+						for (topExp.Init(currentFace, TopAbs_EDGE); topExp.More(); topExp.Next())
 						{
+							auto e = TopoDS::Edge(topExp.Current());
 							TopoDS_Vertex first;
 							TopoDS_Vertex second;
-							TopExp::Vertices(TopoDS::Edge(e), first, second);
-							if (v2.IsSame(first) || v2.IsSame(second))
+							TopExp::Vertices(e, first, second);
+							if (((v.IsSame(first) && v2.IsSame(second)) || (v2.IsSame(first) && v.IsSame(second))) && !edgeMap[e])
 							{
 								auto edgeFaces = edgeToFaceMap.FindFromKey(e);
-								auto face1 = TopoDS::Face(edgeFaces.First());
-								auto face2 = TopoDS::Face(edgeFaces.Last());
-								auto n1 = FaceNormal(face1);
-								auto n2 = FaceNormal(face2);
-								n1.normalize();
-								n2.normalize();
-								if (n1.dot(n2) > cos(creaseAngle*M_PI / 180))
+								for (auto f : edgeFaces)
 								{
-									//expand edge
-									if (faces[face1] == 0)
+									auto face = TopoDS::Face(f);
+									if (faces[face] == 0)
 									{
-										faceQueue.push(face1);
-										faces[face1] = 1;
-									}
-									else if (faces[face2] == 0)
-									{
-										faceQueue.push(face2);
-										faces[face2] = 1;
+										faceQueue.push(face);
+										faces[face] = 1;
+										break;
 									}
 								}
 								break;
@@ -332,39 +360,30 @@ namespace FeatureExtractionAlgo {
 					}
 				}
 #pragma endregion
-
+			}
 #pragma region Crease-corner edge expansion
 				for (auto v : classificationResults[1])
 				{
 					auto currentEdges = vertexToEdgeMap.FindFromKey(v);
 					for (auto v2 : classificationResults[2])
 					{
-						for (auto e : currentEdges)
+						for (topExp.Init(currentFace, TopAbs_EDGE); topExp.More(); topExp.Next())
 						{
+							auto e = TopoDS::Edge(topExp.Current());
 							TopoDS_Vertex first;
 							TopoDS_Vertex second;
-							TopExp::Vertices(TopoDS::Edge(e), first, second);
-							if (v2.IsSame(first) || v2.IsSame(second))
+							TopExp::Vertices(e, first, second);
+							if (((v.IsSame(first) && v2.IsSame(second)) || (v2.IsSame(first) && v.IsSame(second))) && !edgeMap[e])
 							{
 								auto edgeFaces = edgeToFaceMap.FindFromKey(e);
-								auto face1 = TopoDS::Face(edgeFaces.First());
-								auto face2 = TopoDS::Face(edgeFaces.Last());
-								auto n1 = FaceNormal(face1);
-								auto n2 = FaceNormal(face2);
-								n1.normalize();
-								n2.normalize();
-								if (n1.dot(n2) > cos(creaseAngle*M_PI / 180))
+								for (auto f : edgeFaces)
 								{
-									//expand edge
-									if (faces[face1] == 0)
+									auto face = TopoDS::Face(f);
+									if (faces[face] == 0)
 									{
-										faceQueue.push(face1);
-										faces[face1] = 1;
-									}
-									else if (faces[face2] == 0)
-									{
-										faceQueue.push(face2);
-										faces[face2] = 1;
+										faceQueue.push(face);
+										faces[face] = 1;
+										break;
 									}
 								}
 								break;
@@ -373,30 +392,166 @@ namespace FeatureExtractionAlgo {
 					}
 				}
 #pragma endregion
-				for (size_t i = 1; i < 3; i++)
-				{
-					result.AddEdgeVertices(classificationResults[i].begin(), classificationResults[i].end(), (EdgeVertexType)i);
-				}
-
+			
+			for (size_t i = 1; i < 3; i++)
+			{
+				result.AddEdgeVertices(classificationResults[i].begin(), classificationResults[i].end(), (EdgeVertexType)i);
 			}
 
-			if (classificationResults[0].size()>0)
-			{
+
 #pragma region Planar vertex expansion
-				for (auto v : classificationResults[0])
+			for (auto v : classificationResults[0])
+			{
+				TopTools_ListOfShape currentFaces = vertexToFaceMap.FindFromKey(v);
+				for (auto x : currentFaces)
 				{
-					TopTools_ListOfShape currentFaces = vertexToFaceMap.FindFromKey(v);
-					for (auto x : currentFaces)
+					auto f = TopoDS::Face(x);
+					if (faces[f] == 0)
 					{
-						auto f = TopoDS::Face(x);
-						if (faces[f] == 0)
+						faceQueue.push(f);
+						faces[f] = 1;
+					}
+				}
+			}
+#pragma endregion
+			
+		}
+		result.ProcessEdges();
+		return result;
+	}
+
+	FeatureExtractionAlgo::ExtractedFeatures EdgewiseMethod(TopoDS_Shape model, float creaseAngle /*= 5.0f*/)
+	{
+		TopTools_IndexedDataMapOfShapeListOfShape vertexToEdgeMap;
+		TopExp::MapShapesAndAncestors(model, TopAbs_VERTEX,TopAbs_EDGE, vertexToEdgeMap);
+		TopTools_IndexedDataMapOfShapeListOfShape edgeToFaceMap;
+		TopExp::MapShapesAndAncestors(model, TopAbs_EDGE, TopAbs_FACE, edgeToFaceMap);
+		TopExp_Explorer topExp;
+
+		map<TopoDS_Edge, bool, Shape_Compare> edgeMap;
+
+		double cosCreaseAngle = cos(creaseAngle*M_PI/180);
+
+		for (topExp.Init(model, TopAbs_EDGE); topExp.More();topExp.Next())
+		{
+			auto edge = TopoDS::Edge(topExp.Current());
+			
+			auto faces = edgeToFaceMap.FindFromKey(edge);
+
+			if (faces.Size() != 2)
+			{
+				throw; //Shouldn't be possible
+			}
+
+			auto n1 = FaceNormal(TopoDS::Face(faces.First()));
+			auto n2 = FaceNormal(TopoDS::Face(faces.Last()));
+			n1.normalize();
+			n2.normalize();
+			auto dotProduct = n1.dot(n2);
+
+			bool val = dotProduct < cosCreaseAngle;
+
+			edgeMap.insert({ edge,val });
+		}
+
+		VerticesTypeMap vertMap;
+
+		for (topExp.Init(model, TopAbs_VERTEX); topExp.More(); topExp.Next())
+		{
+			auto v = TopoDS::Vertex(topExp.Current());
+			auto cE = vertexToEdgeMap.FindFromKey(v);
+			EdgesSet currentEdges;
+			for (auto e : cE)
+			{
+				currentEdges.insert(TopoDS::Edge(e));
+			}
+
+			int numCreases = 0;
+			for (auto e : currentEdges)
+			{
+				if (edgeMap[e])
+				{
+					numCreases++;
+				}
+			}
+
+			EdgeVertexType cat;
+			switch (numCreases)
+			{
+			case 0:
+				cat = PLANAR;
+				break;
+			case 2:
+				cat = CREASE;
+				break;
+			default:
+				cat = CORNER;
+				break;
+			}
+
+			vertMap[v] = cat;
+		}
+
+		FacesMap<int> faces;
+		for (topExp.Init(model, TopAbs_FACE); topExp.More(); topExp.Next())
+		{
+			faces.insert({ TopoDS::Face(topExp.Current()), 0 });
+		}
+
+		int numFaces = faces.size();
+
+		ExtractedFeatures result;
+		stack<TopoDS_Face> faceQueue;
+		while (result.NumFaces() < numFaces)
+		{
+			if (faceQueue.empty())
+			{
+				result.push_back(ExtractedFeature());
+				for (auto kp : faces)
+				{
+					if (kp.second == 0)
+					{
+						faceQueue.push(kp.first);
+						faces[kp.first] = 1;
+						break;
+					}
+				}
+			}
+
+			auto currentFace = faceQueue.top();
+			faceQueue.pop();
+
+			for (topExp.Init(currentFace, TopAbs_EDGE); topExp.More(); topExp.Next())
+			{
+				auto currentEdge = TopoDS::Edge(topExp.Current());
+				if (!edgeMap[currentEdge])
+				{
+					auto edgeFaces = edgeToFaceMap.FindFromKey(currentEdge);
+					for (auto f:edgeFaces)
+					{
+						if (!currentFace.IsSame(f) && faces[TopoDS::Face(f)]==0)
 						{
-							faceQueue.push(f);
-							faces[f] = 1;
+							faceQueue.push(TopoDS::Face(f));
+							faces[TopoDS::Face(f)] = 1;
 						}
 					}
 				}
-#pragma endregion
+			}
+
+			VerticesSet currentVertices;
+			for (topExp.Init(currentFace, TopAbs_VERTEX); topExp.More(); topExp.Next())
+			{
+				currentVertices.insert(TopoDS::Vertex(topExp.Current()));
+			}
+			result.ExpandFeature(currentFace, currentVertices.begin(), currentVertices.end());
+			faces[currentFace] = 2;
+
+			for (auto v:currentVertices)
+			{
+				if (vertMap[v] != PLANAR)
+				{
+					result.AddEdgeVertex(v, vertMap[v]);
+				}
 			}
 		}
 		result.ProcessEdges();
@@ -416,18 +571,25 @@ namespace FeatureExtractionAlgo {
 		TopoDS_Edge edge1 = TopoDS::Edge(currentEdges.First());
 		auto v11 = BRep_Tool::Pnt(TopExp::FirstVertex(edge1));
 		auto v12 = BRep_Tool::Pnt(TopExp::LastVertex(edge1));
-		Vector3d e1(v11.X() - v12.X(), v11.Y() - v12.Y(), v11.Z() - v12.Z());
+		Vector3d e1(v12.X() - v11.X(), v12.Y() - v11.Y(), v12.Z() - v11.Z());
 
 		TopoDS_Edge edge2 = TopoDS::Edge(currentEdges.Last());
 		auto v21 = BRep_Tool::Pnt(TopExp::FirstVertex(edge2));
 		auto v22 = BRep_Tool::Pnt(TopExp::LastVertex(edge2));
-		Vector3d e2(v21.X() - v22.X(), v21.Y() - v22.Y(), v21.Z() - v22.Z());
+		Vector3d e2(v22.X() - v21.X(), v22.Y() - v21.Y(), v22.Z() - v21.Z());
 
-		Vector3d crossProduct = e1.cross(e2);
+		if (!TopExp::FirstVertex(edge1).IsSame(currentVertex))
+			e1 *= -1;
+		if (!TopExp::FirstVertex(edge2).IsSame(currentVertex))
+			e2 *= -1;
+		//Vector3d crossProduct = e1.cross(e2);
 
-		double angle = asin(crossProduct.norm() / (e1.norm()*e2.norm()));
+		e1.normalize();
+		e2.normalize();
 
-		double currentWeight = crossProduct.norm();// / (e1.dot(e1)*e2.dot(e2));
+		double angle = acos(e1.dot(e2));
+
+		double currentWeight = angle;// / (e1.dot(e1)*e2.dot(e2));
 		return currentWeight;
 	}
 
@@ -493,9 +655,8 @@ namespace FeatureExtractionAlgo {
 	{
 		for (auto f: currentFaces)
 		{
-			//auto f = TopoDS::Face(*ite2);
 			auto currentNormal = FaceNormal(f);
-			auto currentWeight = FaceNormalWeightMWSLER(f, v);
+			auto currentWeight = FaceNormalWeightMWA(f, v);
 			normalTensorSum += currentWeight * currentNormal * currentNormal.transpose();
 			normalSum += currentWeight * currentNormal;
 		}
@@ -582,9 +743,9 @@ namespace FeatureExtractionAlgo {
 
 	bool ExtractedFeature::ContainsVertex(TopoDS_Vertex vertex)
 	{
-		for (size_t i = 0; i < vertices.size(); i++)
+		for (auto v:vertices)
 		{
-			if (vertex.IsSame(vertices[i]))
+			if (vertex.IsSame(v.first))
 				return true;
 		}
 		return false;
@@ -872,4 +1033,16 @@ namespace FeatureExtractionAlgo {
 
 		return;
 	}
+
+	const vector<TopoDS_Vertex> ExtractedFeature::GetVertices()
+	{
+		vector<TopoDS_Vertex> result;
+		result.reserve(vertices.size());
+		for (auto v:vertices)
+		{
+			result.push_back(v.first);
+		}
+		return result;
+	}
+
 }

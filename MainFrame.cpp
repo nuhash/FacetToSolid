@@ -167,7 +167,8 @@ void MyFrame::Init()
 	auto methodSelSizer = new wxBoxSizer(wxHORIZONTAL);
 	wxArrayString str;
 	str.Add("Normal Tensor Framework Method");
-	str.Add("second value");
+	str.Add("Hybrid Edgewise Normal Tensor Framework Method");
+	str.Add("Edgewise Method");
 	extMethodList = new wxChoice(featureExtPage, wxID_ANY,wxDefaultPosition,wxDefaultSize,str);
 	methodSelSizer->Add(extMethodList, 1, wxALIGN_TOP, 2);
 	auto extFeaturesButton = new wxButton(featureExtPage, FTS_ExtractFeatures, "Extract Features");
@@ -242,7 +243,16 @@ void MyFrame::OnExtractFeatures(wxCommandEvent& event)
 		}
 		break;
 	case 1:
-		features = FeatureExtractionAlgo::EdgewiseNormalTensorFrameworkMethod(occView->GetCurrentShape());
+		features = FeatureExtractionAlgo::HybridEdgewiseNormalTensorFrameworkMethod(occView->GetCurrentShape());
+		for (size_t i = 0; i < features.size(); i++)
+		{
+			wxString label = wxString::Format(wxT("Faces:%i;Edges:%i"), features.at(i).NumFaces(), features.at(i).NumEdges());
+			featureSel->AppendString(label);
+			featureSel2->AppendString(label);
+		}
+		break;
+	case 2:
+		features = FeatureExtractionAlgo::EdgewiseMethod(occView->GetCurrentShape());
 		for (size_t i = 0; i < features.size(); i++)
 		{
 			wxString label = wxString::Format(wxT("Faces:%i;Edges:%i"), features.at(i).NumFaces(), features.at(i).NumEdges());

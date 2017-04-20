@@ -39,6 +39,7 @@ namespace FeatureExtractionAlgo
 	};
 	enum EdgeVertexType
 	{
+		NONE = -1,
 		PLANAR = 0,
 		CREASE = 1,
 		CORNER = 2
@@ -56,19 +57,29 @@ namespace FeatureExtractionAlgo
 
 	};
 
-	class VerticesMap : public map<TopoDS_Vertex, EdgeVertexType, Shape_Compare>
+	class VerticesTypeMap : public map<TopoDS_Vertex, EdgeVertexType, Shape_Compare>
 	{
 
 	};
 
-	class FacesMap : public std::map<TopoDS_Face, int, Shape_Compare>
+	template<typename ValType>
+	class VerticesMap : public map<TopoDS_Vertex, ValType, Shape_Compare>
+	{
+
+	};
+
+	template <typename ValType>
+	class FacesMap : public std::map<TopoDS_Face, ValType, Shape_Compare>
 	{
 
 	};
 
 	class FacesSet : public std::set<TopoDS_Face, Shape_Compare> {};
 
+	class EdgesSet :public set<TopoDS_Edge, Shape_Compare>
+	{
 
+	};
 	enum EdgeType
 	{
 		CONTINUOUS,
@@ -94,8 +105,8 @@ namespace FeatureExtractionAlgo
 			if (!ContainsFace(face))
 				faces.push_back(face);
 		}
-		void AddVertex(TopoDS_Vertex vertex) { vertices.push_back(vertex); }
-		void AddEdgeVertex(TopoDS_Vertex vertex, EdgeVertexType type) { edgeVertices.insert({ vertex,type }); }
+		void AddVertex(TopoDS_Vertex vertex, EdgeVertexType type = PLANAR) { vertices.insert({ vertex, type }); }
+		void AddEdgeVertex(TopoDS_Vertex vertex, EdgeVertexType type) { vertices[vertex] = type; edgeVertices.insert({ vertex,type }); }
 		int NumFaces() { return faces.size(); }
 		bool ContainsFace(TopoDS_Face face);
 		bool ContainsVertex(TopoDS_Vertex vertex);
@@ -110,13 +121,13 @@ namespace FeatureExtractionAlgo
 		bool IsVertexEdge(TopoDS_Vertex vertex);
 		bool IsVertexEdgeProcessed(TopoDS_Vertex vertex);
 		const vector<TopoDS_Face> GetFaces() { return faces; }
-		const vector<TopoDS_Vertex> GetVertices() { return vertices; }
+		const vector<TopoDS_Vertex> GetVertices();
 		int NumEdges() { return extractedEdges.size(); }
 		int NumEdgeGroups() { return edgeGroups.size(); }
 	protected:
 	private:
 		vector<TopoDS_Face> faces;
-		vector<TopoDS_Vertex> vertices;
+		VerticesTypeMap vertices;
 		map<TopoDS_Vertex,EdgeVertexType, Shape_Compare> edgeVertices;
 		vector<EdgeVertexType> edgeVerticesTypes;
 		vector<ExtractedFeatureEdge> extractedEdges;
@@ -149,14 +160,18 @@ namespace FeatureExtractionAlgo
 				begin++;
 			}
 		}
+		void AddEdgeVertex(TopoDS_Vertex vertex, EdgeVertexType type)
+		{
+			this->back().AddEdgeVertex(vertex, type);
+		}
 	protected:
 	private:
 	};
 
 	//static double NormalWeight(TopoDS_Face face, TopoDS_Vertex vertex);
 	ExtractedFeatures NormalTensorFrameworkMethod(TopoDS_Shape model, float creaseAngle = 5.0f);
-	ExtractedFeatures EdgewiseNormalTensorFrameworkMethod(TopoDS_Shape model, float creaseAngle = 5.0f);
-
+	ExtractedFeatures HybridEdgewiseNormalTensorFrameworkMethod(TopoDS_Shape model, float creaseAngle = 5.0f);
+	ExtractedFeatures EdgewiseMethod(TopoDS_Shape model, float creaseAngle = 5.0f);
 	double FaceNormalWeightMWSLER(TopoDS_Face currentFace, TopoDS_Vertex currentVertex);
 	
 	Vector3d FaceNormal(TopoDS_Face face);
