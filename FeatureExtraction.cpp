@@ -263,7 +263,7 @@ namespace FeatureExtractionAlgo {
 			Vector3d::Index vertexClass;
 			vertexClassification.maxCoeff(&vertexClass);
 			vertMap[v] = (EdgeVertexType)vertexClass;
-			cout << converter(v) << "\n" << vertexClass << "\n\n";
+			
 		}
 
 
@@ -1044,5 +1044,7 @@ namespace FeatureExtractionAlgo {
 		}
 		return result;
 	}
+
+
 
 }

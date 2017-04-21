@@ -21,22 +21,17 @@
 #include <TopExp.hxx>
 #include <queue>
 #include <unordered_map>
+#include "Utilities.h"
+
+//#include "FeatureCategorisation.h"
 
 using namespace std;
 using namespace Eigen;
+using namespace Utilities;
 namespace FeatureExtractionAlgo
 {
 //public:
-	struct ConversionHelpers {
-		Vector3d operator()(const TopoDS_Vertex& v) const
-		{
-			auto p = BRep_Tool::Pnt(v);
-			return Vector3d(p.X(), p.Y(), p.Z());
-		}
 
-
-		
-	};
 	enum EdgeVertexType
 	{
 		NONE = -1,
@@ -44,8 +39,7 @@ namespace FeatureExtractionAlgo
 		CREASE = 1,
 		CORNER = 2
 	};
-	Vector3d operator|(const TopoDS_Vertex v, ConversionHelpers c);
-	const ConversionHelpers converter;
+	
 	struct Shape_Compare {
 		bool operator() (const TopoDS_Shape& lhs, const TopoDS_Shape& rhs) const {
 			return lhs.HashCode(1<<30)<rhs.HashCode(1<<30);
@@ -91,11 +85,24 @@ namespace FeatureExtractionAlgo
 		FeatureExtractionAlgo::EdgeType Type() const { return type; }
 		void AddVertex(TopoDS_Vertex vertex) { push_back(vertex); }
 		void Type(FeatureExtractionAlgo::EdgeType val) { type = val; }
+		const vector<TopoDS_Vertex> EdgeVertices() const { return edgeVertices; }
 	protected:
 	private:
 		EdgeType type;
 		vector<TopoDS_Vertex> edgeVertices;
 	};
+	struct EdgeHash
+	{
+		size_t operator() (const ExtractedFeatureEdge &edge) const {
+			auto first = edge.front().HashCode(65535);
+			auto second = (*(edge.begin()++)).HashCode(65535);
+			auto secondLast = (*(edge.rbegin()++)).HashCode(65535);
+			auto back = edge.back().HashCode(65535);
+			return first & second << 16 & secondLast << 32 & back << 48;
+		}
+	};
+
+	class EdgeGroups : public vector<vector<ExtractedFeatureEdge>> {};
 
 	class ExtractedFeature
 	{
@@ -113,17 +120,17 @@ namespace FeatureExtractionAlgo
 		TopoDS_Face GetFace(int n) { return faces[n]; };
 		TopoDS_Vertex GetNearbyEdgeVertex(TopoDS_Shape shape, TopoDS_Vertex vertex);
 		void ProcessEdges();
-		int FindCornerVertex();
 		void CreateEdge(TopoDS_Vertex vertex, TopoDS_Edge edge, EdgeType type, map<TopoDS_Vertex, pair<EdgeVertexType, int>, Shape_Compare> &edgeVertexMap, map<int, ExtractedFeatureEdge> &edgeMap, queue<int> &edgeQueue, int &numProcessed, vector<TopoDS_Vertex> &verticesToProcess);
 		void ProcessEdgeGroups();
-		//bool CreateNewEdge(vector<ExtractedFeatureEdge>& queue, TopTools_IndexedDataMapOfShapeListOfShape v2e, TopTools_IndexedDataMapOfShapeListOfShape e2f, TopoDS_Vertex &vertex, EdgeVertexType &type);
-		int FindEdgeVertex(TopoDS_Vertex vertex);
-		bool IsVertexEdge(TopoDS_Vertex vertex);
-		bool IsVertexEdgeProcessed(TopoDS_Vertex vertex);
+
 		const vector<TopoDS_Face> GetFaces() { return faces; }
 		const vector<TopoDS_Vertex> GetVertices();
 		int NumEdges() { return extractedEdges.size(); }
 		int NumEdgeGroups() { return edgeGroups.size(); }
+		const EdgeGroups GetEdgeGroups() const { return edgeGroups; }
+		const vector<ExtractedFeatureEdge> GetEdges() const { return extractedEdges; }
+		//FeatureCategorisation::CategorisationType Type() const { return type; }
+	
 	protected:
 	private:
 		vector<TopoDS_Face> faces;
@@ -131,7 +138,8 @@ namespace FeatureExtractionAlgo
 		map<TopoDS_Vertex,EdgeVertexType, Shape_Compare> edgeVertices;
 		vector<EdgeVertexType> edgeVerticesTypes;
 		vector<ExtractedFeatureEdge> extractedEdges;
-		vector<vector<ExtractedFeatureEdge>> edgeGroups;
+		EdgeGroups edgeGroups;
+
 	};
 
 	class ExtractedFeatures : public vector<ExtractedFeature>
@@ -164,6 +172,7 @@ namespace FeatureExtractionAlgo
 		{
 			this->back().AddEdgeVertex(vertex, type);
 		}
+
 	protected:
 	private:
 	};

@@ -1,9 +1,9 @@
 #pragma once
 
 #include "FeatureExtraction.h"
-class SurfaceReconstructionAlgo
+namespace SurfaceReconstructionAlgo
 {
-public:
+
 	class ReconstructedSurface
 	{
 	public:
@@ -16,9 +16,9 @@ public:
 	public:
 	protected:
 	private:
+
 	};
 
-	static ReconstructedObject EdgeFitNURBS(FeatureExtractionAlgo::ExtractedFeatures features);
-protected:
-private:
+	ReconstructedObject EdgeFitNURBS(FeatureExtractionAlgo::ExtractedFeatures features);
+
 };

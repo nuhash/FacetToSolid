@@ -10,49 +10,50 @@
 #include <Eigen/Eigenvalues>
 #include <tuple>
 #include <c:/Program Files (x86)/Microsoft Visual Studio 12.0/VC/INCLUDE/utility>
-//#include <ppl.h>
+#include <math.h>
+#include "FeatureExtraction.h"
 
 using namespace Eigen;
 using namespace std;
+using namespace Utilities;
+using namespace FeatureExtractionAlgo;
 
 namespace FeatureCategorisation {
 
 
-	bool PlanarCheck(const vector<TopoDS_Face> faces, double creaseAngle)
+	bool PlanarCheck(const vector<TopoDS_Vertex> vertices, const vector<TopoDS_Face> faces, double tolerance=0.1)
 	{
-		double limit = cos(creaseAngle);
-		double sum = 0;
-		Vector3d normalAvg(0, 0, 0);
-
-		if (faces.size() == 1)
+		if (vertices.size() == 3)
 		{
 			return true;
 		}
 
-		for (size_t i = 0; i < faces.size(); i++)
+		MatrixXd A(vertices.size(), 3);
+		Vector3d sum(0, 0, 0);
+		for (size_t i = 0; i < vertices.size(); i++)
 		{
-			auto currentFace = faces[i];
-
-			Standard_Real umin, umax, vmin, vmax;
-			BRepTools::UVBounds(currentFace, umin, umax, vmin, vmax);
-
-			auto currentSurface = BRep_Tool::Surface(currentFace);
-
-			GeomLProp_SLProps props(currentSurface, umin, vmin, 1, 0.01);
-			gp_Dir normal = props.Normal();
-			Vector3d currentNormal(normal.X(), normal.Y(), normal.Z());
-
-			if (i != 0)
-			{
-				auto dotProduct = normalAvg.dot(currentNormal);
-				if (dotProduct < limit)
-					return false;
-			}
-
-
-			normalAvg = (i*normalAvg) / (i + 1) + currentNormal / (i + 1);
+			A.row(i) = converter(vertices[i]);
+			sum += converter(vertices[i]);
 		}
-		return true;
+		sum /= vertices.size();
+		A = A.rowwise() - sum.transpose();
+		BDCSVD<MatrixXd> svd(A, ComputeThinU| ComputeThinV);
+		Vector3d normal = svd.matrixV().rightCols<1>();
+
+		if (!faces[0].IsNull())
+		{
+			auto faceNormal = converter(faces[0]);
+			double dotProd = faceNormal.dot(normal);
+			normal *= _dsign(dotProd);
+		}
+		normal.normalize();
+
+		auto dist2 = A*normal;
+
+		auto maxDist2 = dist2.maxCoeff();
+
+		return maxDist2 > tolerance;
+		/*return true;*/
 	}
 
 	bool SphericalCheck(const vector<TopoDS_Vertex> vertices, double allowableError = 0.1 /*= 0.1*/)
@@ -96,13 +97,12 @@ namespace FeatureCategorisation {
 		return true;
 	}
 
-	bool TubularCheck(const vector<TopoDS_Vertex> vertices, int numEdgeGroups, double allowableError = 0.1 /*= 0.1*/)
+	bool TubularCheck(const vector<TopoDS_Vertex> vertices, EdgeGroups edgeGroups, int numSections = 5, double allowableError = 0.1 /*= 0.1*/)
 	{
-		//Edge groups are not currently available
-		//if (numEdgeGroups != 2) \\&& edgeType == CONTINUOUS
-		//{
-		//	return false;
-		//}
+		if (edgeGroups.size() != 2)
+		{
+			return false;
+		}
 
 		MatrixXd v(vertices.size(), 3);
 		for (size_t i = 0; i < vertices.size(); i++)
@@ -137,31 +137,89 @@ namespace FeatureCategorisation {
 			return left.first < right.first;
 		});
 
-
-
 		return true;
 	}
 
-	CategorisationType FeatureCategorisation::Categorise(FeatureExtractionAlgo::ExtractedFeature feature, double creaseAngle /*= 5*/)
+	FeatureCategorisation::FeatureCategorisationType CategoriseFeatures(FeatureExtractionAlgo::ExtractedFeature feature, double creaseAngle /*= 5*/)
 	{
 		auto faces = feature.GetFaces();
 		auto vertices = feature.GetVertices();
 		auto numEdgeGroups = feature.NumEdgeGroups();
-		if (PlanarCheck(faces, creaseAngle))
+		auto edgeGroups = feature.GetEdgeGroups();
+		FeatureCategorisationType result;
+		if (PlanarCheck(vertices, faces, creaseAngle))
 		{
-			return PLANAR;
+			result = PLANAR;
 		}
+		else
+			if (SphericalCheck(vertices))
+			{
+				return SPHERICAL;
+			}
+			else
+				if (TubularCheck(vertices, edgeGroups))
+				{
+					return TUBULAR;
+				}
 
-		if (SphericalCheck(vertices))
+		//feature.Type(result);
+
+		return result;
+	}
+
+	bool LinearCheck(MatrixXd V, double tolerance = 0.1)
+	{
+		auto centroid = V.colwise().mean();
+		V.rowwise() -= centroid;
+		BDCSVD<MatrixXd> svd(V, ComputeThinU | ComputeThinV);
+		Vector3d normal = svd.matrixV().leftCols<1>();
+		normal.normalize();
+		auto dist2 = V*normal;
+
+		auto maxDist2 = dist2.maxCoeff();
+
+		return maxDist2 > tolerance;
+	}
+
+	bool CircleCheck(vector<TopoDS_Vertex> vertices, double tolerance = 0.1)
+	{
+		TopoDS_Face face;
+		face.Nullify();
+		return SphericalCheck(vertices) && PlanarCheck(vertices, { face });
+	}
+
+	void CategoriseEdges(const ExtractedFeatures &features, EdgeCategoryMap &edgeCategoryMap)
+	{
+		for (auto f:features)
 		{
-			return SPHERICAL;
-		}
+			auto edges = f.GetEdges();
+			for (auto e:edges)
+			{
+				auto vertices = e.EdgeVertices();
+				MatrixXd v(vertices.size(),3);
+				for (size_t i = 0; i < vertices.size(); i++)
+				{
+					v.row(i) = converter(vertices[i]);
+				}
 
-		if (TubularCheck(vertices, numEdgeGroups))
-		{
-			return TUBULAR;
-		}
+				//v.rowwise() -= v.colwise().mean();
 
-		return COMPLEX;
+				EdgeCategorisationType result;
+
+				if (LinearCheck(v))
+				{
+					result = LINEAR;
+				}
+				else
+					if (CircleCheck(vertices))
+					{
+						result = CIRCULAR;
+					}
+					else
+						result = FREE;
+
+				edgeCategoryMap.insert({ e,result });
+			}
+		}
 	}
 }

@@ -199,9 +199,13 @@ void MyFrame::Init()
 	featureSel2 = new wxListBox(surfFitPage, FTS_FeatureSelect);
 	auto categoriseButton = new wxButton(surfFitPage, FTS_CategoriseFeatures, "Categorise Features");
 	categoryInfo = new wxListBox(surfFitPage, -1);
+	auto changeCategoryButton = new wxButton(surfFitPage, -1, "Change Category");
+	auto reconstructButton = new wxButton(surfFitPage, -1, "Reconstruct Surfaces");
 	featureSelSizer2->Add(featureSel2, 1, wxEXPAND | wxALIGN_TOP, 0);
 	featureSelSizer2->Add(categoriseButton, 1, wxEXPAND);
 	featureSelSizer2->Add(categoryInfo,1,wxEXPAND);
+	featureSelSizer2->Add(changeCategoryButton, 1, wxEXPAND);
+	featureSelSizer2->Add(reconstructButton, 1, wxEXPAND);
 	surfFitSizer->Add(featureSelSizer2);
 	surfFitPage->SetSizer(surfFitSizer);
 	myNotebook->AddPage(surfFitPage, L"Surface Fitting");
@@ -228,8 +232,6 @@ void MyFrame::OnExtractFeatures(wxCommandEvent& event)
 {
 	featureSel->Clear();
 	int currentSelection = extMethodList->GetCurrentSelection();
-
-	
 
 	switch (currentSelection)
 	{
@@ -271,7 +273,7 @@ void MyFrame::OnCategorise(wxCommandEvent& event)
 {
 	for (size_t i = 0; i < features.size(); i++)
 	{
-		auto cat = FeatureCategorisation::Categorise(features[i]);
+		auto cat = FeatureCategorisation::CategoriseFeatures(features[i]);
 		wxString label = wxString::Format(wxT("Faces:%i;Edges:%i;Category:%i"), features.at(i).NumFaces(), features.at(i).NumEdges(),cat);
 		categoryInfo->AppendString(label);
 	}

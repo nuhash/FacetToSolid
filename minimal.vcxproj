@@ -431,6 +431,7 @@
     <ClCompile Include="OCCView.cpp" />
     <ClCompile Include="OCCWindow.cpp" />
     <ClCompile Include="SurfaceReconstruction.cpp" />
+    <ClCompile Include="Utilities.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BSpline.h" />
