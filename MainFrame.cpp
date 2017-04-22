@@ -25,6 +25,7 @@ enum
 	FTS_ExtractFeatures = wxID_HIGHEST + 3,
 	FTS_FeatureSelect = wxID_HIGHEST +4,
 	FTS_CategoriseFeatures = wxID_HIGHEST +5,
+	FTS_Reconstruct = wxID_HIGHEST+6,
 	// it is important for the id corresponding to the "About" command to have
 	// this standard value as otherwise it won't be handled properly under Mac
 	// (where it is special and put into the "Apple" menu)
@@ -46,6 +47,7 @@ EVT_BUTTON(FTS_ExportCrude, MyFrame::OnCrudeExport)
 EVT_BUTTON(FTS_ExtractFeatures, MyFrame::OnExtractFeatures)
 EVT_LISTBOX(FTS_FeatureSelect, MyFrame::OnFeatureSelect)
 EVT_BUTTON(FTS_CategoriseFeatures, MyFrame::OnCategorise)
+EVT_BUTTON(FTS_Reconstruct, MyFrame::OnReconstruct)
 wxEND_EVENT_TABLE()
 
 // ----------------------------------------------------------------------------
@@ -200,7 +202,7 @@ void MyFrame::Init()
 	auto categoriseButton = new wxButton(surfFitPage, FTS_CategoriseFeatures, "Categorise Features");
 	categoryInfo = new wxListBox(surfFitPage, -1);
 	auto changeCategoryButton = new wxButton(surfFitPage, -1, "Change Category");
-	auto reconstructButton = new wxButton(surfFitPage, -1, "Reconstruct Surfaces");
+	auto reconstructButton = new wxButton(surfFitPage, FTS_Reconstruct, "Reconstruct Surfaces");
 	featureSelSizer2->Add(featureSel2, 1, wxEXPAND | wxALIGN_TOP, 0);
 	featureSelSizer2->Add(categoriseButton, 1, wxEXPAND);
 	featureSelSizer2->Add(categoryInfo,1,wxEXPAND);
@@ -278,5 +280,13 @@ void MyFrame::OnCategorise(wxCommandEvent& event)
 		categoryInfo->AppendString(label);
 	}
 	
+}
+
+void MyFrame::OnReconstruct(wxCommandEvent& event)
+{
+	FeatureCategorisation::EdgeCategoryMap edgeCategoryMap;
+
+	FeatureCategorisation::CategoriseEdges(features, edgeCategoryMap);
+
 }
 

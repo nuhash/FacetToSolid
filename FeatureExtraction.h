@@ -94,11 +94,35 @@ namespace FeatureExtractionAlgo
 	struct EdgeHash
 	{
 		size_t operator() (const ExtractedFeatureEdge &edge) const {
-			auto first = edge.front().HashCode(65535);
-			auto second = (*(edge.begin()++)).HashCode(65535);
-			auto secondLast = (*(edge.rbegin()++)).HashCode(65535);
-			auto back = edge.back().HashCode(65535);
-			return first & second << 16 & secondLast << 32 & back << 48;
+			size_t result;
+			if (edge.Type()==FINITE)
+			{
+				auto first = edge.front().HashCode(65535);
+				auto second = (*(edge.begin()++)).HashCode(65535);
+				auto secondLast = (*(edge.rbegin()++)).HashCode(65535);
+				auto back = edge.back().HashCode(65535);
+				result = first & second << 16 & secondLast << 32 & back << 48;
+			}
+			else
+			{
+				size_t maxHash = 0;
+				size_t minHash = 0xFFFFFFFFFFFFFFFF;
+				for (auto v:edge)
+				{
+					auto currentHash = v.HashCode(1 << 30);
+					if (currentHash>maxHash)
+					{
+						maxHash = currentHash;
+					}
+
+					if (currentHash<minHash)
+					{
+						minHash = currentHash;
+					}
+				}
+				result = maxHash && minHash << 32;
+			}
+			return result;
 		}
 	};
 

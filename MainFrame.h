@@ -23,6 +23,7 @@ public:
 	void Init();
 	void OnExtractFeatures(wxCommandEvent& event);
 	void OnCategorise(wxCommandEvent& event);
+	void OnReconstruct(wxCommandEvent& event);
 private:
 	// any class wishing to process wxWidgets events must use this macro
 	OCCWindow *occWindow;
