@@ -26,6 +26,11 @@ namespace Utilities {
 
 			return Vector3d(normal.X(), normal.Y(), normal.Z());
 		}
+		template<typename ThreeParamCons>
+		ThreeParamCons operator()(const Vector3d v) const
+		{
+			return ThreeParamCons(v.x(), v.y(), v.z());
+		}
 
 	};
 	const ConversionHelpers converter;

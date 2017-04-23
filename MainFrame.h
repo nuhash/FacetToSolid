@@ -7,6 +7,8 @@
 #include "OCCWindow.h"
 #include "occview.h"
 #include "FeatureExtraction.h"
+#include "FeatureCategorisation.h"
+#include <memory>
 
 class MyFrame : public wxFrame
 {
@@ -34,5 +36,7 @@ private:
 	wxListBox *categoryInfo;
 	wxNotebook *myNotebook;
 	FeatureExtractionAlgo::ExtractedFeatures features;
+	FeatureCategorisation::EdgeCategoryMap edgeCategoryMap;
+	vector<shared_ptr<FeatureCategorisation::SurfaceCategorisationData>> featureData;
 	wxDECLARE_EVENT_TABLE();
 };

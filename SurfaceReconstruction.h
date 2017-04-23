@@ -26,20 +26,27 @@ namespace SurfaceReconstructionAlgo
 	ReconstructedSurface ReconstructSurface(ExtractedFeature feature, FeatureCategorisationType type, EdgeCategoryMap &edgeCategoryMap);
 	class ReconstructedEdgeMap : public unordered_map<ExtractedFeatureEdge, TopoDS_Edge, EdgeHash> {};
 
+
 	class SurfaceReconstructor
 	{
 	public:
+		SurfaceReconstructor(ExtractedFeatures &_features, vector<shared_ptr<SurfaceCategorisationData>> &_featureData, EdgeCategoryMap _edgeCategoryMap) :features(_features), edgeCategoryMap(_edgeCategoryMap), featureData(_featureData)
+		{
 
-		FeatureCategorisation::EdgeCategoryMap& EdgeCategoryMap() { return edgeCategoryMap; }
+		}
 		
-		void Process(vector<pair<ExtractedFeature, FeatureCategorisationType>> features);
+		
+		void Process();
 		
 	protected:
-		void ReconstructPlanarSurface(ExtractedFeature feature);
-		void ReconstructLinearEdge(ExtractedFeatureEdge edge);
+		void ReconstructPlanarSurface(ExtractedFeature feature, const shared_ptr<SurfaceCategorisationData> data);
+		void ReconstructLinearEdge(ExtractedFeatureEdge edge, const shared_ptr<EdgeCategorisationData> data);
+		void ReconstructCircularEdge(ExtractedFeatureEdge edge, const shared_ptr<EdgeCategorisationData> data);
 		void ReconstructEdges(vector<ExtractedFeatureEdge> edges);
 	private:
-		FeatureCategorisation::EdgeCategoryMap edgeCategoryMap;
+		EdgeCategoryMap &edgeCategoryMap;
+		vector<shared_ptr<SurfaceCategorisationData>> &featureData;
+		ExtractedFeatures &features;
 		ReconstructedObject object;
 		ReconstructedEdgeMap reconstructedEdgeMap;
 	};

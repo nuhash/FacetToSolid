@@ -273,10 +273,11 @@ void MyFrame::OnExtractFeatures(wxCommandEvent& event)
 
 void MyFrame::OnCategorise(wxCommandEvent& event)
 {
+	FeatureCategorisation::CategoriseFeatures(features, featureData);
+	FeatureCategorisation::CategoriseEdges(features, edgeCategoryMap);
 	for (size_t i = 0; i < features.size(); i++)
 	{
-		auto cat = FeatureCategorisation::CategoriseFeatures(features[i]);
-		wxString label = wxString::Format(wxT("Faces:%i;Edges:%i;Category:%i"), features.at(i).NumFaces(), features.at(i).NumEdges(),cat);
+		wxString label = wxString::Format(wxT("Faces:%i;Edges:%i;Category:%i"), features.at(i).NumFaces(), features.at(i).NumEdges(),featureData[i]->type);
 		categoryInfo->AppendString(label);
 	}
 	
@@ -284,9 +285,7 @@ void MyFrame::OnCategorise(wxCommandEvent& event)
 
 void MyFrame::OnReconstruct(wxCommandEvent& event)
 {
-	FeatureCategorisation::EdgeCategoryMap edgeCategoryMap;
-
-	FeatureCategorisation::CategoriseEdges(features, edgeCategoryMap);
+	
 
 }
 

@@ -9,9 +9,10 @@
 #include <TopoDS.hxx>
 #include <Eigen/Eigenvalues>
 #include <tuple>
-#include <c:/Program Files (x86)/Microsoft Visual Studio 12.0/VC/INCLUDE/utility>
+#include <utility>
 #include <math.h>
 #include "FeatureExtraction.h"
+#include <memory>
 
 using namespace Eigen;
 using namespace std;
@@ -21,7 +22,7 @@ using namespace FeatureExtractionAlgo;
 namespace FeatureCategorisation {
 
 
-	bool PlanarCheck(const vector<TopoDS_Vertex> vertices, const vector<TopoDS_Face> faces, double tolerance=0.1)
+	bool PlanarCheck(const vector<TopoDS_Vertex> vertices, const vector<TopoDS_Face> faces, shared_ptr<SurfaceCategorisationData> &data, double tolerance=0.1)
 	{
 		if (vertices.size() == 3)
 		{
@@ -29,14 +30,13 @@ namespace FeatureCategorisation {
 		}
 
 		MatrixXd A(vertices.size(), 3);
-		Vector3d sum(0, 0, 0);
 		for (size_t i = 0; i < vertices.size(); i++)
 		{
 			A.row(i) = converter(vertices[i]);
-			sum += converter(vertices[i]);
+
 		}
-		sum /= vertices.size();
-		A = A.rowwise() - sum.transpose();
+		Vector3d centroid = A.colwise().mean();
+		A.rowwise() -= centroid.transpose();
 		BDCSVD<MatrixXd> svd(A, ComputeThinU| ComputeThinV);
 		Vector3d normal = svd.matrixV().rightCols<1>();
 
@@ -51,12 +51,20 @@ namespace FeatureCategorisation {
 		auto dist2 = A*normal;
 
 		auto maxDist2 = dist2.maxCoeff();
-
-		return maxDist2 > tolerance;
+		auto temp = make_shared<PlanarSurfaceData>();
+		if (maxDist2 < tolerance)
+		{
+			temp->normal = normal;
+			temp->type = PLANAR;
+			temp->centroid = centroid;
+			data = temp;
+			return true;
+		}
+		return false;
 		/*return true;*/
 	}
 
-	bool SphericalCheck(const vector<TopoDS_Vertex> vertices, double allowableError = 0.1 /*= 0.1*/)
+	bool SphericalCheck(const vector<TopoDS_Vertex> vertices, shared_ptr<SurfaceCategorisationData> &data, double allowableError = 0.1 /*= 0.1*/)
 	{
 		//if (faces.size() == 1)
 		//	return false;
@@ -94,6 +102,12 @@ namespace FeatureCategorisation {
 				return false;
 			}
 		}
+
+		auto temp = make_shared<SphericalSurfaceData>();
+		temp->position = centre;
+		temp->radius = radius;
+		temp->type = SPHERICAL;
+		data = temp;
 		return true;
 	}
 
@@ -137,22 +151,23 @@ namespace FeatureCategorisation {
 			return left.first < right.first;
 		});
 
-		return true;
+		return false;
 	}
 
-	FeatureCategorisation::FeatureCategorisationType CategoriseFeatures(FeatureExtractionAlgo::ExtractedFeature feature, double creaseAngle /*= 5*/)
+	FeatureCategorisation::FeatureCategorisationType CategoriseFeature(FeatureExtractionAlgo::ExtractedFeature feature, shared_ptr<SurfaceCategorisationData> &data, double creaseAngle /*= 5*/)
 	{
 		auto faces = feature.GetFaces();
 		auto vertices = feature.GetVertices();
 		auto numEdgeGroups = feature.NumEdgeGroups();
 		auto edgeGroups = feature.GetEdgeGroups();
 		FeatureCategorisationType result;
-		if (PlanarCheck(vertices, faces, creaseAngle))
+		//shared_ptr<SurfaceCategorisationData> data = nullptr;
+		if (PlanarCheck(vertices, faces, data, creaseAngle))
 		{
 			result = PLANAR;
 		}
 		else
-			if (SphericalCheck(vertices))
+			if (SphericalCheck(vertices, data))
 			{
 				return SPHERICAL;
 			}
@@ -167,10 +182,34 @@ namespace FeatureCategorisation {
 		return result;
 	}
 
-	bool LinearCheck(MatrixXd V, double tolerance = 0.1)
+	void CategoriseFeatures(FeatureExtractionAlgo::ExtractedFeatures features, vector<shared_ptr<SurfaceCategorisationData>> &data, double creaseAngle /*= 5*/)
 	{
-		auto centroid = V.colwise().mean();
-		V.rowwise() -= centroid;
+		data.clear();
+		for (auto feature:features)
+		{
+			shared_ptr<FeatureCategorisation::SurfaceCategorisationData> newData = nullptr;
+			auto faces = feature.GetFaces();
+			auto vertices = feature.GetVertices();
+			auto numEdgeGroups = feature.NumEdgeGroups();
+			auto edgeGroups = feature.GetEdgeGroups();
+			FeatureCategorisationType result;
+			//shared_ptr<SurfaceCategorisationData> data = nullptr;
+			if (!PlanarCheck(vertices, faces, newData, creaseAngle))
+			{
+				if (!SphericalCheck(vertices, newData))
+				{
+					TubularCheck(vertices, edgeGroups);
+					throw;
+				}
+			}
+			data.push_back(newData);
+		}
+	}
+
+	bool LinearCheck(MatrixXd V, shared_ptr<EdgeCategorisationData> &data, double tolerance = 0.1)
+	{
+		Vector3d centroid = V.colwise().mean();
+		V.rowwise() -= centroid.transpose();
 		BDCSVD<MatrixXd> svd(V, ComputeThinU | ComputeThinV);
 		Vector3d normal = svd.matrixV().leftCols<1>();
 		normal.normalize();
@@ -178,47 +217,71 @@ namespace FeatureCategorisation {
 
 		auto maxDist2 = dist2.maxCoeff();
 
-		return maxDist2 > tolerance;
+		if (maxDist2 > tolerance)
+		{
+			auto temp = make_shared<LinearEdgeData>();
+			temp->type = LINEAR;
+			temp->dir = normal;
+			temp->pos = centroid;
+			data = temp;
+			return true;
+		}
+		return false;
 	}
 
-	bool CircleCheck(vector<TopoDS_Vertex> vertices, double tolerance = 0.1)
+	bool CircleCheck(vector<TopoDS_Vertex> vertices, shared_ptr<EdgeCategorisationData> &data, double tolerance = 0.1)
 	{
 		TopoDS_Face face;
 		face.Nullify();
-		return SphericalCheck(vertices) && PlanarCheck(vertices, { face });
+		auto temp = make_shared<CircularEdgeData>();
+		auto temp2 = make_shared<SurfaceCategorisationData>();
+		if (SphericalCheck(vertices, temp2))
+		{
+			temp->position = static_pointer_cast<SphericalSurfaceData>(temp2)->position;
+			temp->radius = static_pointer_cast<SphericalSurfaceData>(temp2)->radius;
+			if (PlanarCheck(vertices, { face }, temp2))
+			{
+				temp->normal = static_pointer_cast<PlanarSurfaceData>(temp2)->normal;
+				temp->type = CIRCULAR;
+				return true;
+			}
+		}
+		return false;// SphericalCheck(vertices) && PlanarCheck(vertices, { face });
 	}
 
 	void CategoriseEdges(const ExtractedFeatures &features, EdgeCategoryMap &edgeCategoryMap)
 	{
+		edgeCategoryMap.clear();
 		for (auto f:features)
 		{
 			auto edges = f.GetEdges();
 			for (auto e:edges)
 			{
-				auto vertices = e.EdgeVertices();
-				MatrixXd v(vertices.size(),3);
-				for (size_t i = 0; i < vertices.size(); i++)
+				//auto vertices = e.EdgeVertices();
+				MatrixXd v(e.size(),3);
+				for (size_t i = 0; i < e.size(); i++)
 				{
-					v.row(i) = converter(vertices[i]);
+					v.row(i) = converter(e[i]);
 				}
 
 				//v.rowwise() -= v.colwise().mean();
 
 				EdgeCategorisationType result;
-
-				if (LinearCheck(v))
+				shared_ptr<EdgeCategorisationData> ptr = nullptr;
+				if (!LinearCheck(v, ptr))
 				{
-					result = LINEAR;
+					//if (!CircleCheck(vertices, ptr))
+					CircleCheck(e, ptr);
 				}
-				else
-					if (CircleCheck(vertices))
+				/*else
+					if (CircleCheck(vertices, ptr))
 					{
 						result = CIRCULAR;
 					}
 					else
-						result = FREE;
+						result = FREE;*/
 
-				edgeCategoryMap.insert({ e,result });
+				edgeCategoryMap.insert({ e,ptr });
 			}
 		}
 	}

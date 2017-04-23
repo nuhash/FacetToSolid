@@ -1034,6 +1034,26 @@ namespace FeatureExtractionAlgo {
 		return;
 	}
 
+	vector<ExtractedFeatureEdge>& ExtractedFeature::GetOuterEdgeGroup(int &index)
+	{
+		auto verts = GetVertices();
+		MatrixXd V(verts.size(), 3);
+		for (size_t i = 0; i < verts.size(); i++)
+		{
+			V.row(i) = converter(verts[i]);
+		}
+		Vector3d centroid = V.colwise().mean();
+		V.rowwise() -= centroid.transpose();
+		VectorXd dist2 = V*V.transpose();
+		
+		int maxDist2;
+		dist2.maxCoeff(&maxDist2);
+
+		auto maxVertex = verts[maxDist2];
+
+		return edgeGroups.FindEdgeGroup(maxVertex,index);
+	}
+
 	const vector<TopoDS_Vertex> ExtractedFeature::GetVertices()
 	{
 		vector<TopoDS_Vertex> result;
@@ -1046,5 +1066,22 @@ namespace FeatureExtractionAlgo {
 	}
 
 
+
+	vector<ExtractedFeatureEdge>& EdgeGroups::FindEdgeGroup(TopoDS_Vertex v, int &index)
+	{
+		for (auto eg : *this)
+		{
+			for (auto e:eg)
+			{
+				for (auto vert:e)
+				{
+					if (v.IsSame(vert))
+					{
+						return eg;
+					}
+				}
+			}
+		}
+	}
 
 }
