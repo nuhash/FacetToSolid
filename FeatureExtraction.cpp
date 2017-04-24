@@ -990,7 +990,9 @@ namespace FeatureExtractionAlgo {
 			{
 				numEdgeGroups++;
 				edgesProcessed++;
-				edgeGroups.push_back({ edge });
+				EdgeGroup newEdge;
+				newEdge.push_back(edge);
+				edgeGroups.push_back(newEdge);
 				ite = edgeList.erase(ite);
 			}
 			else
@@ -1001,7 +1003,9 @@ namespace FeatureExtractionAlgo {
 		{
 			auto edge = edgeList.back();
 			edgeList.pop_back();
-			edgeGroups.push_back({ edge });
+			EdgeGroup newEdge;
+			newEdge.push_back(edge);
+			edgeGroups.push_back({ newEdge });
 			edgesProcessed++;
 			numEdgeGroups++;
 			TopoDS_Vertex startVertex, endVertex;
@@ -1034,7 +1038,7 @@ namespace FeatureExtractionAlgo {
 		return;
 	}
 
-	vector<ExtractedFeatureEdge>& ExtractedFeature::GetOuterEdgeGroup(int &index)
+	void ExtractedFeature::GetOuterEdgeGroup(int &index)
 	{
 		auto verts = GetVertices();
 		MatrixXd V(verts.size(), 3);
@@ -1044,14 +1048,14 @@ namespace FeatureExtractionAlgo {
 		}
 		Vector3d centroid = V.colwise().mean();
 		V.rowwise() -= centroid.transpose();
-		VectorXd dist2 = V*V.transpose();
+		VectorXd dist2 = V.rowwise().squaredNorm();//V*V.transpose();
 		
 		int maxDist2;
 		dist2.maxCoeff(&maxDist2);
 
 		auto maxVertex = verts[maxDist2];
 
-		return edgeGroups.FindEdgeGroup(maxVertex,index);
+		edgeGroups.FindEdgeGroup(maxVertex,index);
 	}
 
 	const vector<TopoDS_Vertex> ExtractedFeature::GetVertices()
@@ -1069,6 +1073,7 @@ namespace FeatureExtractionAlgo {
 
 	vector<ExtractedFeatureEdge>& EdgeGroups::FindEdgeGroup(TopoDS_Vertex v, int &index)
 	{
+		index = 0;
 		for (auto eg : *this)
 		{
 			for (auto e:eg)
@@ -1081,6 +1086,7 @@ namespace FeatureExtractionAlgo {
 					}
 				}
 			}
+			index++;
 		}
 	}
 

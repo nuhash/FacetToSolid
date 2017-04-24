@@ -27,7 +27,6 @@ namespace FeatureCategorisation
 
 	struct CategorisationData
 	{
-		//EdgeCategorisationType type;
 	};
 
 	struct EdgeCategorisationData : CategorisationData
@@ -35,7 +34,7 @@ namespace FeatureCategorisation
 		EdgeCategorisationType type;
 	};
 
-	struct SurfaceCategorisationData
+	struct SurfaceCategorisationData : CategorisationData
 	{
 		FeatureCategorisationType type;
 	};
@@ -55,6 +54,8 @@ namespace FeatureCategorisation
 	{
 		Vector3d normal;
 		Vector3d centroid;
+		gp_Dir normal2;
+		Vector3d normal3;
 	};
 
 	struct SphericalSurfaceData : SurfaceCategorisationData

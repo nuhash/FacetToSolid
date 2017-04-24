@@ -10,6 +10,7 @@
 #include "FeatureExtraction.h"
 #include <c:/OpenCASCADE7.1.0-vc10-64/opencascade-7.1.0/inc/TopoDS_Compound.hxx>
 #include "FeatureCategorisation.h"
+#include "SurfaceReconstruction.h"
 // ----------------------------------------------------------------------------
 // constants
 // ----------------------------------------------------------------------------
@@ -273,6 +274,9 @@ void MyFrame::OnExtractFeatures(wxCommandEvent& event)
 
 void MyFrame::OnCategorise(wxCommandEvent& event)
 {
+	featureData.clear();
+	edgeCategoryMap.clear();
+	categoryInfo->Clear();
 	FeatureCategorisation::CategoriseFeatures(features, featureData);
 	FeatureCategorisation::CategoriseEdges(features, edgeCategoryMap);
 	for (size_t i = 0; i < features.size(); i++)
@@ -285,7 +289,8 @@ void MyFrame::OnCategorise(wxCommandEvent& event)
 
 void MyFrame::OnReconstruct(wxCommandEvent& event)
 {
-	
-
+	SurfaceReconstructionAlgo::SurfaceReconstructor reconstructor(features, featureData, edgeCategoryMap);
+	reconstructor.Process();
+	occView->drawShape(reconstructor.GetShape());
 }
 

@@ -9,6 +9,7 @@
 #include <gp_Circ.hxx>
 #include <gp_Pln.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
+#include <BRepBuilderAPI_MakeWire.hxx>
 namespace SurfaceReconstructionAlgo {
 
 	void SurfaceReconstructor::ReconstructLinearEdge(ExtractedFeatureEdge edge, const shared_ptr<EdgeCategorisationData> data)
@@ -21,7 +22,7 @@ namespace SurfaceReconstructionAlgo {
 		Handle(Geom_Line) line = new Geom_Line(axis);
 		BRepBuilderAPI_MakeEdge mE(line, edge.front(), edge.back());
 
-		reconstructedEdgeMap.insert({ edge, TopoDS::Edge(mE.Shape()) });
+		reconstructedEdgeMap.insert({ edge.Hash(), TopoDS::Edge(mE.Shape()) });
 	}
 
 	void SurfaceReconstructor::ReconstructCircularEdge(ExtractedFeatureEdge edge, const shared_ptr<EdgeCategorisationData> data)
@@ -46,7 +47,7 @@ namespace SurfaceReconstructionAlgo {
 			mE = BRepBuilderAPI_MakeEdge(circle, edge.front(), edge.back());
 		}
 
-		reconstructedEdgeMap.insert({ edge,TopoDS::Edge(mE.Shape()) });		
+		reconstructedEdgeMap.insert({ edge.Hash(),TopoDS::Edge(mE.Shape()) });		
 	}
 
 	void ReconstructPlane()
@@ -60,64 +61,103 @@ namespace SurfaceReconstructionAlgo {
 	}
 
 	void SurfaceReconstructor::Process()
-{
-	for (size_t i = 0; i < features.size();i++)
+	{
+		ReconstructEdges();
+		for (size_t i = 0; i < features.size();i++)
 		{
 			auto feature = features[i];
 			auto data = featureData[i];
+			auto &reconstructedEdges = reconstructedEdgeGroups[i];
 			switch (data->type)
 			{
 			default:
 				break;
 			case FeatureCategorisation::PLANAR:
+				ReconstructPlanarSurface(feature, data, reconstructedEdges);
 				break;
 			case FeatureCategorisation::SPHERICAL:
+				throw;
 				break;
 			case FeatureCategorisation::TUBULAR:
+				throw;
 				break;
 			case FeatureCategorisation::SWEPT:
+				throw;
 				break;
 			case FeatureCategorisation::COMPLEX:
+				throw;
 				break;
 			}
 		}
+		sew.Perform();
 	}
 
-	void SurfaceReconstructor::ReconstructPlanarSurface(ExtractedFeature feature, const shared_ptr<SurfaceCategorisationData> data)
+	void SurfaceReconstructor::ReconstructPlanarSurface(ExtractedFeature feature, const shared_ptr<SurfaceCategorisationData> data, vector<TopoDS_Wire> &reconstructedEdges)
 	{
-		shared_ptr<PlanarSurfaceData> planeData = static_pointer_cast<PlanarSurfaceData>(data);
-		gp_Pln pln(converter.operator () < gp_Pnt > (planeData->centroid), converter.operator() < gp_Dir > (planeData->normal));
-		BRepBuilderAPI_MakeFace mF(pln);
+		auto surfData = static_pointer_cast<PlanarSurfaceData>(data);
+		auto centroid = surfData->centroid;
+		auto normal = surfData->normal;
+
+		gp_Pnt point(centroid.x(), centroid.y(), centroid.z());
+		gp_Dir dir(normal.x(), normal.y(), normal.z());
+		gp_Pln pln(point, dir);
 		int outerEdgeGroupIndex;
-		auto outerEdgeGroup = feature.GetOuterEdgeGroup(outerEdgeGroupIndex);
+		feature.GetOuterEdgeGroup(outerEdgeGroupIndex);
+		BRepBuilderAPI_MakeFace mF(reconstructedEdges[outerEdgeGroupIndex]);
+		
+		mF.Add(reconstructedEdges[outerEdgeGroupIndex]);
+
+		for (size_t i = 0; i < reconstructedEdges.size(); i++)
+		{
+			if (i==outerEdgeGroupIndex)
+			{
+				continue;
+			}
+			mF.Add(reconstructedEdges[i]);
+		}
+
+		sew.Add(mF.Shape());
+		builder.Add(tempShape,mF.Shape());
 		//find outer edgeGroup
 		//add outer edgeGroup
 		//add others
 	}
 
-	void SurfaceReconstructor::ReconstructEdges(vector<ExtractedFeatureEdge> edges)
-	{
-		for (auto edge:edges)
+	void SurfaceReconstructor::ReconstructEdges()
+{
+
+		for (auto &feature:features)
 		{
-			if (reconstructedEdgeMap.count(edge)==1)
+			auto edgeGroups = feature.GetEdgeGroups();
+			reconstructedEdgeGroups.push_back({});
+			for (auto &edgeGroup : edgeGroups)
 			{
-				continue;
-			}
-			auto data = edgeCategoryMap[edge];
-			
-			switch (data->type)
-			{
-			default:
-				break;
-			case FeatureCategorisation::LINEAR:
-				ReconstructLinearEdge(edge, data);
-				break;
-			case FeatureCategorisation::CIRCULAR:
-				ReconstructCircularEdge(edge, data);
-				break;
-			case FeatureCategorisation::FREE:
-				throw;
-				break;
+				BRepBuilderAPI_MakeWire mW;
+				for (auto &edge:edgeGroup)
+				{
+					
+					if (reconstructedEdgeMap.count(edge.Hash())==0)
+					{
+						cout << edge.Hash() << endl;
+						auto data = edgeCategoryMap[edge];
+						switch (data->type)
+						{
+						default:
+							break;
+						case FeatureCategorisation::LINEAR:
+							ReconstructLinearEdge(edge, data);
+							break;
+						case FeatureCategorisation::CIRCULAR:
+							ReconstructCircularEdge(edge, data);
+							break;
+						case FeatureCategorisation::FREE:
+							throw;
+							break;
+						}
+					}
+					mW.Add(reconstructedEdgeMap[edge.Hash()]);
+				}
+				reconstructedEdgeGroups.back().push_back(TopoDS::Wire(mW.Shape()));
 			}
 		}
 	}

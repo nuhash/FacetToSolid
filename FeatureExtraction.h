@@ -92,6 +92,62 @@ namespace FeatureExtractionAlgo
 		void AddVertex(TopoDS_Vertex vertex) { push_back(vertex); }
 		void Type(FeatureExtractionAlgo::EdgeType val) { type = val; }
 		const vector<TopoDS_Vertex> EdgeVertices() const { return edgeVertices; }
+		size_t Hash()
+		{
+			size_t result;
+			if (Type() == FINITE)
+			{
+				TopoDS_Vertex front;
+				TopoDS_Vertex front2;
+				TopoDS_Vertex back2;
+				TopoDS_Vertex back;
+				if (Shape_Compare().operator()(this->front(), this->back()))
+				{
+					front = this->front();
+					back = this->back();
+				}
+				else
+				{
+					front = this->back();
+					back = this->front();
+				}
+				if (Shape_Compare().operator()((*(this->begin()++)), (*(this->rbegin()++))))
+				{
+					front2 = (*(this->begin()++));
+					back2 = (*(this->rbegin()++));
+				}
+				else
+				{
+					front2 = (*(this->rbegin()++));
+					back2 = (*(this->begin()++));
+				}
+				size_t first = front.HashCode(0xFFFF);
+				size_t second = front2.HashCode(0xFFFF);
+				size_t secondLast = back2.HashCode(0xFFFF);
+				size_t last = back.HashCode(0x7FFF);
+				result = first | second << 16 | secondLast << 32 | last << 48;
+			}
+			else
+			{
+				size_t maxHash = 0;
+				size_t minHash = 0xFFFFFFFFFFFFFFFF;
+				for (auto v : *this)
+				{
+					auto currentHash = v.HashCode(0x7FFFFFFF);
+					if (currentHash > maxHash)
+					{
+						maxHash = currentHash;
+					}
+
+					if (currentHash < minHash)
+					{
+						minHash = currentHash;
+					}
+				}
+				result = maxHash | minHash << 32;
+			}
+			return result;
+		}
 	protected:
 	private:
 		EdgeType type;
@@ -103,11 +159,35 @@ namespace FeatureExtractionAlgo
 			size_t result;
 			if (edge.Type()==FINITE)
 			{
-				auto first = edge.front().HashCode(65535);
-				auto second = (*(edge.begin()++)).HashCode(65535);
-				auto secondLast = (*(edge.rbegin()++)).HashCode(65535);
-				auto back = edge.back().HashCode(65535);
-				result = first & second << 16 & ((__int64)secondLast) << 32 & ((__int64)back) << 48;
+				TopoDS_Vertex front;
+				TopoDS_Vertex front2;
+				TopoDS_Vertex back2;
+				TopoDS_Vertex back;
+				if (Shape_Compare().operator()(edge.front(),edge.back()))
+				{
+					front = edge.front();
+					back = edge.back();
+				}
+				else
+				{
+					front = edge.back();
+					back = edge.front();
+				}
+				if (Shape_Compare().operator()((*(edge.begin()++)), (*(edge.rbegin()++))))
+				{
+					front2 = (*(edge.begin()++));
+					back2 = (*(edge.rbegin()++));
+				}
+				else
+				{
+					front2 = (*(edge.rbegin()++));
+					back2 = (*(edge.begin()++));
+				}
+				size_t first = front.HashCode(0xFFFF);
+				size_t second = front2.HashCode(0xFFFF);
+				size_t secondLast = back2.HashCode(0xFFFF);
+				size_t last = back.HashCode(0x7FFF);
+				result = first | second << 16 | secondLast<< 32 | last << 48;
 			}
 			else
 			{
@@ -115,7 +195,7 @@ namespace FeatureExtractionAlgo
 				size_t minHash = 0xFFFFFFFFFFFFFFFF;
 				for (auto v:edge)
 				{
-					auto currentHash = v.HashCode(1 << 30);
+					auto currentHash = v.HashCode(0x7FFFFFFF);
 					if (currentHash>maxHash)
 					{
 						maxHash = currentHash;
@@ -126,13 +206,20 @@ namespace FeatureExtractionAlgo
 						minHash = currentHash;
 					}
 				}
-				result = maxHash && minHash << 32;
+				result = maxHash | minHash << 32;
 			}
 			return result;
 		}
 	};
 
-	class EdgeGroups : public vector<vector<ExtractedFeatureEdge>> 
+	class EdgeGroup : public vector<ExtractedFeatureEdge>
+	{
+	public:
+	protected:
+	private:
+	};
+
+	class EdgeGroups : public vector<EdgeGroup> 
 	{
 	public:
 		vector<ExtractedFeatureEdge>& FindEdgeGroup(TopoDS_Vertex v, int &index);
@@ -156,7 +243,7 @@ namespace FeatureExtractionAlgo
 		void ProcessEdges();
 		void CreateEdge(TopoDS_Vertex vertex, TopoDS_Edge edge, EdgeType type, map<TopoDS_Vertex, pair<EdgeVertexType, int>, Shape_Compare> &edgeVertexMap, map<int, ExtractedFeatureEdge> &edgeMap, queue<int> &edgeQueue, int &numProcessed, vector<TopoDS_Vertex> &verticesToProcess);
 		void ProcessEdgeGroups();
-		vector<ExtractedFeatureEdge>& GetOuterEdgeGroup(int &index);
+		void GetOuterEdgeGroup(int &index);
 		const vector<TopoDS_Face> GetFaces() { return faces; }
 		const vector<TopoDS_Vertex> GetVertices();
 		int NumEdges() { return extractedEdges.size(); }

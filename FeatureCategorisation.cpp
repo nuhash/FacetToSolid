@@ -44,9 +44,9 @@ namespace FeatureCategorisation {
 		{
 			auto faceNormal = converter(faces[0]);
 			double dotProd = faceNormal.dot(normal);
-			normal *= _dsign(dotProd);
+			normal *= (dotProd > 0) - (dotProd < 0);
 		}
-		normal.normalize();
+		//normal.normalize();
 
 		auto dist2 = A*normal;
 
@@ -54,9 +54,12 @@ namespace FeatureCategorisation {
 		auto temp = make_shared<PlanarSurfaceData>();
 		if (maxDist2 < tolerance)
 		{
-			temp->normal = normal;
+			temp->normal = Vector3d(normal.x(),normal.y(),normal.z());
 			temp->type = PLANAR;
 			temp->centroid = centroid;
+			temp->normal2 = gp_Dir(normal.x(), normal.y(), normal.z());
+			temp->normal3 = Vector3d(temp->normal);
+
 			data = temp;
 			return true;
 		}
