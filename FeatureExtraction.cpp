@@ -791,7 +791,7 @@ namespace FeatureExtractionAlgo {
 
 		int numProcessed = 0;
 		
-		while (numProcessed<edgeVertices.size())
+		while (numProcessed<edgeVertices.size()||!edgeQueue.empty())
 		{
 #pragma region Queue populate
 			if (edgeQueue.empty())
@@ -1024,6 +1024,7 @@ namespace FeatureExtractionAlgo {
 						endVertex = currentEdge.front();
 					edgeGroups.back().push_back(currentEdge);
 					ite = edgeList.erase(ite);
+					ite = edgeList.begin();
 					edgesProcessed++;
 					if (startVertex.IsSame(currentEdge.back())|| startVertex.IsSame(currentEdge.front()))
 					{

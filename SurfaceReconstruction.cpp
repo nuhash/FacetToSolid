@@ -103,9 +103,9 @@ namespace SurfaceReconstructionAlgo {
 		gp_Pln pln(point, dir);
 		int outerEdgeGroupIndex;
 		feature.GetOuterEdgeGroup(outerEdgeGroupIndex);
-		BRepBuilderAPI_MakeFace mF(reconstructedEdges[outerEdgeGroupIndex]);
-		
-		mF.Add(reconstructedEdges[outerEdgeGroupIndex]);
+		BRepBuilderAPI_MakeFace mF(reconstructedEdges[outerEdgeGroupIndex], false);
+
+		//mF.Add(reconstructedEdges[outerEdgeGroupIndex]);
 
 		for (size_t i = 0; i < reconstructedEdges.size(); i++)
 		{
