@@ -64,6 +64,14 @@ namespace FeatureCategorisation
 		double radius;
 	};
 
+	struct CylindricalSurfaceData : SurfaceCategorisationData
+	{
+		Vector3d position;
+		Vector3d dir;
+		double radius;
+		double vMax;
+		double vMin;
+	};
 
 
 	FeatureCategorisationType CategoriseFeature(FeatureExtractionAlgo::ExtractedFeature feature, shared_ptr<SurfaceCategorisationData> &data, double creaseAngle = 5);

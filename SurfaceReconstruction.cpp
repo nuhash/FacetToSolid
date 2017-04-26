@@ -10,6 +10,9 @@
 #include <gp_Pln.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
+#include <BRepLib_MakeFace.hxx>
+#include <gp_Cylinder.hxx>
+#include <ShapeFix_Shape.hxx>
 namespace SurfaceReconstructionAlgo {
 
 	void SurfaceReconstructor::ReconstructLinearEdge(ExtractedFeatureEdge edge, const shared_ptr<EdgeCategorisationData> data)
@@ -18,7 +21,7 @@ namespace SurfaceReconstructionAlgo {
 		Vector3d normal = static_pointer_cast<LinearEdgeData>(data)->dir;
 		Vector3d pos = static_pointer_cast<LinearEdgeData>(data)->pos;
 
-		gp_Ax1 axis(gp_Pnt(pos.x(),pos.y(),pos.z()), gp_Dir(normal.x(), normal.y(), normal.z()));
+		gp_Ax1 axis(gp_Pnt(pos.x(), pos.y(), pos.z()), gp_Dir(normal.x(), normal.y(), normal.z()));
 		Handle(Geom_Line) line = new Geom_Line(axis);
 		BRepBuilderAPI_MakeEdge mE(line, edge.front(), edge.back());
 
@@ -32,7 +35,7 @@ namespace SurfaceReconstructionAlgo {
 		Vector3d pos = circularData->position;
 		double radius = circularData->radius;
 
-		gp_Ax2 axis(converter.operator()<gp_Pnt>(pos), converter.operator()<gp_Dir>(normal));
+		gp_Ax2 axis(gp_Pnt(pos.x(), pos.y(), pos.z()), gp_Dir(normal.x(), normal.y(), normal.z()));
 
 		gp_Circ circ(axis, radius);
 
@@ -49,6 +52,8 @@ namespace SurfaceReconstructionAlgo {
 
 		reconstructedEdgeMap.insert({ edge.Hash(),TopoDS::Edge(mE.Shape()) });		
 	}
+
+
 
 	void ReconstructPlane()
 	{
@@ -79,7 +84,7 @@ namespace SurfaceReconstructionAlgo {
 				throw;
 				break;
 			case FeatureCategorisation::CYLINDRICAL:
-				throw;
+				ReconstructCylindricalSurface(feature, data, reconstructedEdges);
 				break;
 			case FeatureCategorisation::SWEPT:
 				throw;
@@ -117,8 +122,38 @@ namespace SurfaceReconstructionAlgo {
 			err = mF.Error();
 		}
 
-		sew.Add(mF.Shape());
+		auto sFS = ShapeFix_Shape(mF.Shape());
+		sFS.Perform();
+
+		sew.Add(sFS.Shape());
 		builder.Add(tempShape,mF.Shape());
+		//find outer edgeGroup
+		//add outer edgeGroup
+		//add others
+	}
+
+	void SurfaceReconstructor::ReconstructCylindricalSurface(ExtractedFeature feature, const shared_ptr<SurfaceCategorisationData> data, vector<TopoDS_Wire> &reconstructedEdges)
+	{
+		auto cylData = static_pointer_cast<CylindricalSurfaceData>(data);
+		auto centroid = cylData->position;
+		auto normal = cylData->dir;
+		auto radius = cylData->radius;
+		auto vMax = cylData->vMax;
+		auto vMin = cylData->vMin;
+
+		gp_Pnt point(centroid.x(), centroid.y(), centroid.z());
+		gp_Dir dir(normal.x(), normal.y(), normal.z());
+		gp_Ax3 axis(point,dir);
+		
+		gp_Cylinder cylinder(axis, radius);
+
+		BRepBuilderAPI_MakeFace mF(cylinder, 0, 2 * M_PI, -100, 100);
+		for (auto rE:reconstructedEdges)
+		{
+			mF.Add(rE);
+		}
+		sew.Add(mF.Shape());
+		builder.Add(tempShape, mF.Shape());
 		//find outer edgeGroup
 		//add outer edgeGroup
 		//add others
@@ -139,7 +174,7 @@ namespace SurfaceReconstructionAlgo {
 					
 					if (reconstructedEdgeMap.count(edge.Hash())==0)
 					{
-						cout << edge.Hash() << endl;
+						
 						auto data = edgeCategoryMap[edge];
 						switch (data->type)
 						{
