@@ -85,6 +85,13 @@ namespace FeatureExtractionAlgo
 		CONTINUOUS,
 		FINITE
 	};
+
+	enum EdgeVertexStatus
+	{
+		UNPROCESSED = 1,
+		QUEUED = 2,
+		PROCESSED = 4
+	};
 	class ExtractedFeatureEdge : public vector<TopoDS_Vertex>
 	{
 	public:

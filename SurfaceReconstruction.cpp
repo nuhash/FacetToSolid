@@ -78,7 +78,7 @@ namespace SurfaceReconstructionAlgo {
 			case FeatureCategorisation::SPHERICAL:
 				throw;
 				break;
-			case FeatureCategorisation::TUBULAR:
+			case FeatureCategorisation::CYLINDRICAL:
 				throw;
 				break;
 			case FeatureCategorisation::SWEPT:
@@ -104,7 +104,7 @@ namespace SurfaceReconstructionAlgo {
 		int outerEdgeGroupIndex;
 		feature.GetOuterEdgeGroup(outerEdgeGroupIndex);
 		BRepBuilderAPI_MakeFace mF(reconstructedEdges[outerEdgeGroupIndex], false);
-
+		auto err = mF.Error();
 		//mF.Add(reconstructedEdges[outerEdgeGroupIndex]);
 
 		for (size_t i = 0; i < reconstructedEdges.size(); i++)
@@ -114,6 +114,7 @@ namespace SurfaceReconstructionAlgo {
 				continue;
 			}
 			mF.Add(reconstructedEdges[i]);
+			err = mF.Error();
 		}
 
 		sew.Add(mF.Shape());

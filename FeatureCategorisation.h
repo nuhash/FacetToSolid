@@ -12,7 +12,7 @@ namespace FeatureCategorisation
 	{
 		PLANAR=0,
 		SPHERICAL=1,
-		TUBULAR=2,
+		CYLINDRICAL=2,
 		SWEPT=3,
 		COMPLEX=4 //Used for all features that cannot be categorised
 	};
@@ -67,7 +67,7 @@ namespace FeatureCategorisation
 
 
 	FeatureCategorisationType CategoriseFeature(FeatureExtractionAlgo::ExtractedFeature feature, shared_ptr<SurfaceCategorisationData> &data, double creaseAngle = 5);
-	void CategoriseFeatures(FeatureExtractionAlgo::ExtractedFeatures features, vector<shared_ptr<SurfaceCategorisationData>> &data, double creaseAngle = 5);
+	void CategoriseFeatures(FeatureExtractionAlgo::ExtractedFeatures features, vector<shared_ptr<SurfaceCategorisationData>> &data, double tolerance= 0.1);
 	class EdgeCategoryMap : public unordered_map<ExtractedFeatureEdge, shared_ptr<EdgeCategorisationData>, EdgeHash> {};
 	
 	void CategoriseEdges(const ExtractedFeatures &features, EdgeCategoryMap &edgeCategoryMap);

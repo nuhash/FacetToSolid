@@ -967,13 +967,14 @@ namespace FeatureExtractionAlgo {
 			if (edgeVertexMap[v].first!=CORNER)
 			{
 				edgeQueue.push(edgeMap.size());
+				numProcessed++;
 			}
 			else
 			{
 				verticesToProcess.push_back(v);
 			}
 			edgeMap.insert({ edgeMap.size(),newEdge });
-			numProcessed++;
+			
 		}
 	}
 
