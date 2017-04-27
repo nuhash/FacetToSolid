@@ -64,10 +64,10 @@ namespace FeatureCategorisation {
 		return averageError;
 	}
 
-	float SphericalCheck(const vector<TopoDS_Vertex> vertices, shared_ptr<SurfaceCategorisationData> &data, int numFaces)
+	float SphericalCheck(const vector<TopoDS_Vertex> vertices, shared_ptr<SurfaceCategorisationData> &data, int numFaces, int numEdgeVerts)
 	{
 		double result;
-		if (numFaces < 8)
+		if (numFaces < 8 || numEdgeVerts > 0.4 * vertices.size())
 			result = HUGE_VAL; //prevent small planar features being categorised as spherical
 		else
 		{
@@ -121,7 +121,7 @@ namespace FeatureCategorisation {
 		return t;
 	}
 
-	double CylindricalCheck(const vector<TopoDS_Vertex> vertices, EdgeGroups edgeGroups, shared_ptr<SurfaceCategorisationData> &data, int numSections = 5, double allowableError = 0.1 /*= 0.1*/)
+	double CylindricalCheck(const vector<TopoDS_Vertex> vertices, EdgeGroups& edgeGroups, shared_ptr<SurfaceCategorisationData> &data, EdgeCategoryMap &edgeCategoryMap)
 	{
 		double result;
 		if (edgeGroups.size() != 2)
@@ -131,46 +131,64 @@ namespace FeatureCategorisation {
 		else
 		{
 			//Check if ends are circles 
-
-			MatrixXd v(vertices.size(), 3);
-			for (size_t i = 0; i < vertices.size(); i++)
+			bool circleCheck = true;
+			for (auto &eG : edgeGroups)
 			{
-				auto pnt = BRep_Tool::Pnt(vertices[i]);
-				v(i, 0) = pnt.X();
-				v(i, 1) = pnt.Y();
-				v(i, 2) = pnt.Z();
+				if (eG.size()>1 || eG.front().Type() != CONTINUOUS || edgeCategoryMap[eG.front()]->type!=CIRCULAR)
+				{
+					circleCheck = false;
+					break;
+				}
 			}
 
-			Vector3d centroid = v.colwise().mean();
-			v.rowwise() -= centroid.transpose();
-			BDCSVD<MatrixXd> svd(v, ComputeThinU | ComputeThinV);
-			Vector3d axis = svd.matrixV().leftCols<1>();
-			Vector3d normal1 = svd.matrixV().rightCols<1>();
-			Vector3d normal2 = svd.matrixV().col(2);
+			if (!circleCheck)
+			{
+				result = HUGE_VAL;
+			}
+			else
+			{
+				MatrixXd v(vertices.size(), 3);
+				for (size_t i = 0; i < vertices.size(); i++)
+				{
+					auto pnt = BRep_Tool::Pnt(vertices[i]);
+					v(i, 0) = pnt.X();
+					v(i, 1) = pnt.Y();
+					v(i, 2) = pnt.Z();
+				}
 
-			TransformToCoordSpace(normal1, normal2, axis);
+				Vector3d centroid = v.colwise().mean();
+				v.rowwise() -= centroid.transpose();
+				BDCSVD<MatrixXd> svd(v, ComputeThinU | ComputeThinV);
+				Vector3d axis = svd.matrixV().leftCols<1>();
+				Vector3d normal1 = svd.matrixV().rightCols<1>();
+				Vector3d normal2 = svd.matrixV().col(2);
 
-			auto t = TransformToCoordSpace(normal1, normal2, axis);
+				TransformToCoordSpace(normal1, normal2, axis);
 
-			MatrixXd vt = v*t.transpose();
+				auto t = TransformToCoordSpace(normal1, normal2, axis);
 
-			VectorXd distFromAxis = (vt.col(0).cwiseAbs2() + vt.col(1).cwiseAbs2()).cwiseSqrt();
-			VectorXd err2DistFromAxis = (distFromAxis.array() - distFromAxis.mean()).cwiseAbs2();
+				MatrixXd vt = v*t.transpose();
 
-			auto temp = make_shared<CylindricalSurfaceData>();
-			temp->dir = axis;
-			temp->position = centroid;
-			temp->radius = HUGE_VAL;
-			temp->type = CYLINDRICAL;
-			temp->vMax = t.col(2).maxCoeff();
-			temp->vMin = t.col(2).minCoeff();
-			data = temp;
-			result = err2DistFromAxis.mean();
+				VectorXd distFromAxis = (vt.col(0).cwiseAbs2() + vt.col(1).cwiseAbs2()).cwiseSqrt();
+				VectorXd err2DistFromAxis = (distFromAxis.array() - distFromAxis.mean()).cwiseAbs2();
+
+				auto temp = make_shared<CylindricalSurfaceData>();
+				temp->dir = axis;
+				temp->position = centroid;
+				temp->radius = HUGE_VAL;
+				temp->type = CYLINDRICAL;
+				temp->vMax = t.col(2).maxCoeff();
+				temp->vMin = t.col(2).minCoeff();
+				data = temp;
+				result = err2DistFromAxis.mean();
+			}
 		}
 		return result;
 	}
 
-	void CategoriseFeatures(FeatureExtractionAlgo::ExtractedFeatures features, vector<shared_ptr<SurfaceCategorisationData>> &data, double tolerance/*= 0.1*/)
+
+
+	void CategoriseFeatures(FeatureExtractionAlgo::ExtractedFeatures features, vector<shared_ptr<SurfaceCategorisationData>> &data, EdgeCategoryMap &edgeCategoryMap, double tolerance/*= 0.1*/)
 	{
 		data.clear();
 		for (auto feature:features)
@@ -179,15 +197,15 @@ namespace FeatureCategorisation {
 			auto faces = feature.GetFaces();
 			auto vertices = feature.GetVertices();
 			auto numEdgeGroups = feature.NumEdgeGroups();
-			auto edgeGroups = feature.GetEdgeGroups();
+			EdgeGroups& edgeGroups = feature.GetEdgeGroups();
 			FeatureCategorisationType result;
-
+			int numEdgeVerts = feature.NumEdgeVertices();
 			array<shared_ptr<SurfaceCategorisationData>, 3> dataArray;
 			dataArray.fill(nullptr);
 			Vector3d r2(0, 0, 0);
 			r2(0) = PlanarCheck(vertices, faces, dataArray[0], tolerance);
-			r2(1) = HUGE_VAL;// SphericalCheck(vertices, dataArray[1], faces.size());
-			r2(2) = CylindricalCheck(vertices, edgeGroups, dataArray[2]);
+			r2(1) = SphericalCheck(vertices, dataArray[1], faces.size(), numEdgeVerts);
+			r2(2) = CylindricalCheck(vertices, edgeGroups, dataArray[2], edgeCategoryMap);
 			
 			int minCoeff;
 			r2.minCoeff(&minCoeff);
@@ -306,5 +324,11 @@ namespace FeatureCategorisation {
 				edgeCategoryMap.insert({ e,dataArray[minCoeff]});
 			}
 		}
+	}
+
+	void Categorise(const ExtractedFeatures &features, EdgeCategoryMap &edgeCategoryMap, vector<shared_ptr<SurfaceCategorisationData>> &data, double tolerance /*= 0.1*/)
+	{
+		CategoriseEdges(features, edgeCategoryMap);
+		CategoriseFeatures(features, data, edgeCategoryMap, tolerance);
 	}
 }

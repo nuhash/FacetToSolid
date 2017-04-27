@@ -1071,8 +1071,6 @@ namespace FeatureExtractionAlgo {
 		return result;
 	}
 
-
-
 	vector<ExtractedFeatureEdge>& EdgeGroups::FindEdgeGroup(TopoDS_Vertex v, int &index)
 	{
 		index = 0;

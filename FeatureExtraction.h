@@ -255,8 +255,9 @@ namespace FeatureExtractionAlgo
 		const vector<TopoDS_Vertex> GetVertices();
 		int NumEdges() { return extractedEdges.size(); }
 		int NumEdgeGroups() { return edgeGroups.size(); }
-		const EdgeGroups GetEdgeGroups() const { return edgeGroups; }
+		EdgeGroups& GetEdgeGroups() { return edgeGroups; }
 		const vector<ExtractedFeatureEdge> GetEdges() const { return extractedEdges; }
+		int NumEdgeVertices() { return edgeVertices.size(); }
 		//FeatureCategorisation::CategorisationType Type() const { return type; }
 	
 	protected:

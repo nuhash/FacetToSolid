@@ -234,6 +234,7 @@ void MyFrame::Init()
 void MyFrame::OnExtractFeatures(wxCommandEvent& event)
 {
 	featureSel->Clear();
+	featureSel2->Clear();
 	int currentSelection = extMethodList->GetCurrentSelection();
 
 	switch (currentSelection)
@@ -276,9 +277,9 @@ void MyFrame::OnCategorise(wxCommandEvent& event)
 {
 	featureData.clear();
 	edgeCategoryMap.clear();
+
 	categoryInfo->Clear();
-	FeatureCategorisation::CategoriseFeatures(features, featureData);
-	FeatureCategorisation::CategoriseEdges(features, edgeCategoryMap);
+	FeatureCategorisation::Categorise(features, edgeCategoryMap, featureData);
 	for (size_t i = 0; i < features.size(); i++)
 	{
 		wxString label = wxString::Format(wxT("Faces:%i;Edges:%i;Category:%i"), features.at(i).NumFaces(), features.at(i).NumEdges(),featureData[i]->type);

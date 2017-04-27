@@ -73,12 +73,12 @@ namespace FeatureCategorisation
 		double vMin;
 	};
 
-
-	FeatureCategorisationType CategoriseFeature(FeatureExtractionAlgo::ExtractedFeature feature, shared_ptr<SurfaceCategorisationData> &data, double creaseAngle = 5);
-	void CategoriseFeatures(FeatureExtractionAlgo::ExtractedFeatures features, vector<shared_ptr<SurfaceCategorisationData>> &data, double tolerance= 0.1);
 	class EdgeCategoryMap : public unordered_map<ExtractedFeatureEdge, shared_ptr<EdgeCategorisationData>, EdgeHash> {};
+	void Categorise(const ExtractedFeatures &features, EdgeCategoryMap &edgeCategoryMap, vector<shared_ptr<SurfaceCategorisationData>> &data, double tolerance = 0.1);
+	/*void CategoriseFeatures(FeatureExtractionAlgo::ExtractedFeatures features, vector<shared_ptr<SurfaceCategorisationData>> &data, double tolerance= 0.1);
 	
-	void CategoriseEdges(const ExtractedFeatures &features, EdgeCategoryMap &edgeCategoryMap);
+	
+	void CategoriseEdges(const ExtractedFeatures &features, EdgeCategoryMap &edgeCategoryMap);*/
 //protected:
 	//bool PlanarCheck(const vector<TopoDS_Face> faces, double creaseAngle);
 	//bool SphericalCheck(const vector<TopoDS_Vertex> vertices, double allowableError = 0.1);

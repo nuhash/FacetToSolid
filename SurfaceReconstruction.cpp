@@ -13,6 +13,8 @@
 #include <BRepLib_MakeFace.hxx>
 #include <gp_Cylinder.hxx>
 #include <ShapeFix_Shape.hxx>
+#include <Geom_CylindricalSurface.hxx>
+#include <BRepFill.hxx>
 namespace SurfaceReconstructionAlgo {
 
 	void SurfaceReconstructor::ReconstructLinearEdge(ExtractedFeatureEdge edge, const shared_ptr<EdgeCategorisationData> data)
@@ -146,13 +148,15 @@ namespace SurfaceReconstructionAlgo {
 		gp_Ax3 axis(point,dir);
 		
 		gp_Cylinder cylinder(axis, radius);
+		Handle(Geom_CylindricalSurface) cylSurf = new Geom_CylindricalSurface(cylinder);
 
-		BRepBuilderAPI_MakeFace mF(cylinder, 0, 2 * M_PI, -100, 100);
-		for (auto rE:reconstructedEdges)
-		{
-			mF.Add(rE);
-		}
-		sew.Add(mF.Shape());
+		BRepBuilderAPI_MakeFace mF(cylSurf, 0.0, 2.0 * M_PI, -100.0, 100.0,0.1);
+		//for (auto rE:reconstructedEdges)
+		//{
+		//	mF.Add(rE);
+		//}
+		TopoDS_Shape shape = BRepFill::Shell(reconstructedEdges.front(),reconstructedEdges.back());
+		sew.Add(shape);
 		builder.Add(tempShape, mF.Shape());
 		//find outer edgeGroup
 		//add outer edgeGroup
