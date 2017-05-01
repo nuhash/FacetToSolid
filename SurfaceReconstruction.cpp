@@ -15,6 +15,8 @@
 #include <ShapeFix_Shape.hxx>
 #include <Geom_CylindricalSurface.hxx>
 #include <BRepFill.hxx>
+#include <gp_Sphere.hxx>
+#include <GC_MakeArcOfCircle.hxx>
 namespace SurfaceReconstructionAlgo {
 
 	void SurfaceReconstructor::ReconstructLinearEdge(ExtractedFeatureEdge edge, const shared_ptr<EdgeCategorisationData> data)
@@ -49,9 +51,15 @@ namespace SurfaceReconstructionAlgo {
 		} 
 		else
 		{
-			mE = BRepBuilderAPI_MakeEdge(circle, edge.front(), edge.back());
+			gp_Pnt p1 = converter.operator() < gp_Pnt > (circularData->p1);
+			gp_Pnt p2 = converter.operator() < gp_Pnt > (circularData->p2);
+			gp_Vec v = converter.operator() < gp_Vec > (circularData->tangent);
+			GC_MakeArcOfCircle arc(p1, v, p2);
+			mE = BRepBuilderAPI_MakeEdge(arc.Value());
 		}
 
+		auto err = mE.Error();
+		//sew.Add(mE.Shape());
 		reconstructedEdgeMap.insert({ edge.Hash(),TopoDS::Edge(mE.Shape()) });		
 	}
 
@@ -83,7 +91,7 @@ namespace SurfaceReconstructionAlgo {
 				ReconstructPlanarSurface(feature, data, reconstructedEdges);
 				break;
 			case FeatureCategorisation::SPHERICAL:
-				throw;
+				ReconstructSphericalSurface(feature,data,reconstructedEdges);
 				break;
 			case FeatureCategorisation::CYLINDRICAL:
 				ReconstructCylindricalSurface(feature, data, reconstructedEdges);
@@ -161,6 +169,27 @@ namespace SurfaceReconstructionAlgo {
 		//find outer edgeGroup
 		//add outer edgeGroup
 		//add others
+	}
+
+	void SurfaceReconstructor::ReconstructSphericalSurface(ExtractedFeature feature, const shared_ptr<SurfaceCategorisationData> data, vector<TopoDS_Wire> &reconstructedEdges)
+	{
+		auto sphericalData = static_pointer_cast<SphericalSurfaceData>(data);
+		auto radius = sphericalData->radius;
+		auto centre = sphericalData->position;
+
+		gp_Ax3 axis(gp_Pnt(centre.x(), centre.y(), centre.z()), gp_Dir(0, 0, 1));
+		gp_Sphere sphere(axis, radius);
+
+		BRepBuilderAPI_MakeFace mF(sphere,reconstructedEdges.front());
+		//for (auto rE:reconstructedEdges)
+		//{
+		//	mF.Add(rE);
+		//}
+		auto sFS = ShapeFix_Shape(mF.Shape());
+		sFS.Perform();
+
+		sew.Add(sFS.Shape());
+
 	}
 
 	void SurfaceReconstructor::ReconstructEdges()

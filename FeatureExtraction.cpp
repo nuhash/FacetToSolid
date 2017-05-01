@@ -64,7 +64,7 @@ namespace FeatureExtractionAlgo {
 		vector<TopoDS_Vertex> vertexQueue;
 		vertexQueue.push_back(*(vertices.rbegin()));
 		vertices.erase(*(vertices.rbegin()));
-		freopen("output.txt", "w", stdout);
+		
 		//cout << "write in file";
 		while (features.NumFaces() < numFaces || !vertexQueue.empty())
 		{
@@ -178,7 +178,7 @@ namespace FeatureExtractionAlgo {
 
 	ExtractedFeatures HybridEdgewiseNormalTensorFrameworkMethod(TopoDS_Shape model, float creaseAngle /*= 5.0f*/)
 	{
-		freopen("output.txt", "w", stdout);
+		
 		TopTools_IndexedDataMapOfShapeListOfShape faceToVertexMap;
 		TopExp::MapShapesAndAncestors(model, TopAbs_FACE, TopAbs_VERTEX, faceToVertexMap);
 		TopTools_IndexedDataMapOfShapeListOfShape faceToEdgeMap;
@@ -187,7 +187,7 @@ namespace FeatureExtractionAlgo {
 		TopExp::MapShapesAndAncestors(model, TopAbs_VERTEX, TopAbs_FACE, vertexToFaceMap);
 		TopTools_IndexedDataMapOfShapeListOfShape edgeToFaceMap;
 		TopExp::MapShapesAndAncestors(model, TopAbs_EDGE, TopAbs_FACE, edgeToFaceMap);
-		double creaseParameter = 5;// 1 / (tan(0.5*creaseAngle)*tan(0.5*creaseAngle)) - 1;
+		double creaseParameter = 50;// 1 / (tan(0.5*creaseAngle)*tan(0.5*creaseAngle)) - 1;
 		TopExp_Explorer topExp;
 		FacesMap<int> faces;
 
@@ -215,11 +215,30 @@ namespace FeatureExtractionAlgo {
 			auto n2 = FaceNormal(TopoDS::Face(faces.Last()));
 			n1.normalize();
 			n2.normalize();
-			auto dotProduct = n1.dot(n2);
+			//auto dotProduct = n1.dot(n2);
 
-			bool val = dotProduct < cosCreaseAngle;
+			Matrix3d normalTensor = n1*n1.transpose() + n2*n2.transpose();
+			EigenSolver<Matrix3d> normalTensorSolver(normalTensor, true);
+			Matrix3d eigenVectors = normalTensorSolver.eigenvectors().real();
+			Vector3d eigenValues = normalTensorSolver.eigenvalues().real();
+			vector<pair<double, Vector3d>> eigenResults;
+			for (size_t i = 0; i < 3; i++)
+			{
+				eigenResults.push_back({ eigenValues[i],eigenVectors.col(i) });
+			}
 
-			edgeMap.insert({ edge,val });
+			std::sort(eigenResults.begin(), eigenResults.end(), [](pair<double, Vector3d> &left, pair<double, Vector3d> &right) {
+				return left.first > right.first;
+			});
+			Vector3d vertexClassification(eigenResults[0].first - eigenResults[1].first,
+				creaseParameter * (eigenResults[1].first - eigenResults[2].first),
+				creaseParameter * eigenResults[2].first);
+			Vector3d::Index vertexClass;
+			vertexClassification.maxCoeff(&vertexClass);
+
+
+
+			edgeMap.insert({ edge,(vertexClass>0) });
 		}
 
 		VerticesTypeMap vertMap;
@@ -430,6 +449,8 @@ namespace FeatureExtractionAlgo {
 
 		map<TopoDS_Edge, bool, Shape_Compare> edgeMap;
 
+		double creaseParameter = 10;
+
 		double cosCreaseAngle = cos(creaseAngle*M_PI/180);
 
 		for (topExp.Init(model, TopAbs_EDGE); topExp.More();topExp.Next())
@@ -447,11 +468,28 @@ namespace FeatureExtractionAlgo {
 			auto n2 = FaceNormal(TopoDS::Face(faces.Last()));
 			n1.normalize();
 			n2.normalize();
-			auto dotProduct = n1.dot(n2);
+			Matrix3d normalTensor = n1*n1.transpose() + n2*n2.transpose();
+			EigenSolver<Matrix3d> normalTensorSolver(normalTensor, true);
+			Matrix3d eigenVectors = normalTensorSolver.eigenvectors().real();
+			Vector3d eigenValues = normalTensorSolver.eigenvalues().real();
+			vector<pair<double, Vector3d>> eigenResults;
+			for (size_t i = 0; i < 3; i++)
+			{
+				eigenResults.push_back({ eigenValues[i],eigenVectors.col(i) });
+			}
 
-			bool val = dotProduct < cosCreaseAngle;
+			std::sort(eigenResults.begin(), eigenResults.end(), [](pair<double, Vector3d> &left, pair<double, Vector3d> &right) {
+				return left.first > right.first;
+			});
+			Vector3d vertexClassification(eigenResults[0].first - eigenResults[1].first,
+				creaseParameter * (eigenResults[1].first - eigenResults[2].first),
+				creaseParameter * eigenResults[2].first);
+			Vector3d::Index vertexClass;
+			vertexClassification.maxCoeff(&vertexClass);
 
-			edgeMap.insert({ edge,val });
+
+
+			edgeMap.insert({ edge,(vertexClass > 0) });
 		}
 
 		VerticesTypeMap vertMap;
@@ -728,8 +766,27 @@ namespace FeatureExtractionAlgo {
 		}
 	}
 
+	int ExtractedFeatures::NumVerts()
+	{
+		int sum = 0;
+		for (auto f:*this)
+		{
+			sum += f.GetVertices().size();
+		}
+		return sum;
+	}
 
 
+
+	int ExtractedFeatures::NumEdgeVerts()
+	{
+		int sum = 0;
+		for (auto f:*this)
+		{
+			sum += f.NumEdgeVertices();
+		}
+		return sum;
+	}
 
 	bool ExtractedFeature::ContainsFace(TopoDS_Face face)
 	{

@@ -11,10 +11,11 @@
 #include <c:/OpenCASCADE7.1.0-vc10-64/opencascade-7.1.0/inc/TopoDS_Compound.hxx>
 #include "FeatureCategorisation.h"
 #include "SurfaceReconstruction.h"
+#include <chrono>
 // ----------------------------------------------------------------------------
 // constants
 // ----------------------------------------------------------------------------
-
+typedef std::chrono::high_resolution_clock Clock;
 // IDs for the controls and the menu commands
 enum
 {
@@ -165,7 +166,7 @@ void MyFrame::Init()
 {
 	myNotebook = new wxNotebook(this, FTS_ModeNotebook, wxDefaultPosition, wxSize(300, 500));
 	auto featureExtPage = new wxPanel(myNotebook, -1);
-	
+	freopen("output.txt", "a", stdout);
 	auto featureExtSizer = new wxBoxSizer(wxVERTICAL);
 	auto methodSelSizer = new wxBoxSizer(wxHORIZONTAL);
 	wxArrayString str;
@@ -235,62 +236,61 @@ void MyFrame::OnExtractFeatures(wxCommandEvent& event)
 {
 	featureSel->Clear();
 	featureSel2->Clear();
-	int currentSelection = extMethodList->GetCurrentSelection();
+	
 
+	int currentSelection = extMethodList->GetCurrentSelection();
+	auto t1 = Clock::now();
 	switch (currentSelection)
 	{
 	case 0: //Normal tensor framework method
 		features = FeatureExtractionAlgo::NormalTensorFrameworkMethod(occView->GetCurrentShape());
-		for (size_t i = 0; i < features.size(); i++)
-		{
-			wxString label = wxString::Format(wxT("Faces:%i;Edges:%i"), features.at(i).NumFaces(), features.at(i).NumEdges());
-			featureSel->AppendString(label);
-			featureSel2->AppendString(label);
-		}
 		break;
 	case 1:
 		features = FeatureExtractionAlgo::HybridEdgewiseNormalTensorFrameworkMethod(occView->GetCurrentShape());
-		for (size_t i = 0; i < features.size(); i++)
-		{
-			wxString label = wxString::Format(wxT("Faces:%i;Edges:%i"), features.at(i).NumFaces(), features.at(i).NumEdges());
-			featureSel->AppendString(label);
-			featureSel2->AppendString(label);
-		}
 		break;
 	case 2:
 		features = FeatureExtractionAlgo::EdgewiseMethod(occView->GetCurrentShape());
-		for (size_t i = 0; i < features.size(); i++)
-		{
-			wxString label = wxString::Format(wxT("Faces:%i;Edges:%i"), features.at(i).NumFaces(), features.at(i).NumEdges());
-			featureSel->AppendString(label);
-			featureSel2->AppendString(label);
-		}
+
 		break;
 	default:
 		break;
 	}
-
+	auto t2 = Clock::now();
+	for (size_t i = 0; i < features.size(); i++)
+	{
+		wxString label = wxString::Format(wxT("Faces:%i;Edges:%i"), features.at(i).NumFaces(), features.at(i).NumEdges());
+		featureSel->AppendString(label);
+		featureSel2->AppendString(label);
+	}
+	cout << "f:" << features.size() << ";" << "f2:" << features.NumFaces() << ";" << "v:" << features.NumVerts() << ";" << "ev:" << features.NumEdgeVerts() << ";" << "t:" << std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count() << endl;
 
 }
 
 void MyFrame::OnCategorise(wxCommandEvent& event)
 {
+
 	featureData.clear();
 	edgeCategoryMap.clear();
 
 	categoryInfo->Clear();
+	auto t1 = Clock::now();
 	FeatureCategorisation::Categorise(features, edgeCategoryMap, featureData);
+	auto t2 = Clock::now();
 	for (size_t i = 0; i < features.size(); i++)
 	{
 		wxString label = wxString::Format(wxT("Faces:%i;Edges:%i;Category:%i"), features.at(i).NumFaces(), features.at(i).NumEdges(),featureData[i]->type);
 		categoryInfo->AppendString(label);
 	}
+	cout << "f:" << features.size() << ";" << "f2:" << features.NumFaces() << ";" << "v:" << features.NumVerts() << ";" << "ev:" << features.NumEdgeVerts() << ";" << "t:" << std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count() << endl;
 	
 }
 
 void MyFrame::OnReconstruct(wxCommandEvent& event)
 {
+	auto t1 = Clock::now();
 	SurfaceReconstructionAlgo::SurfaceReconstructor reconstructor(features, featureData, edgeCategoryMap);
+	auto t2 = Clock::now();
+	cout << "f:" << features.size() << ";" << "f2:" << features.NumFaces() << ";" << "v:" << features.NumVerts() << ";" << "ev:" << features.NumEdgeVerts() << ";" << "t:" << std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count() << endl;
 	reconstructor.Process();
 	occView->drawShape(reconstructor.GetShape());
 }

@@ -25,11 +25,9 @@ namespace FeatureCategorisation {
 
 	double PlanarCheck(const vector<TopoDS_Vertex> vertices, const vector<TopoDS_Face> faces, shared_ptr<SurfaceCategorisationData> &data, double tolerance=0.1)
 	{
-		if (vertices.size() == 3)
-		{
-			return true;
-		}
-
+		auto temp = make_shared<PlanarSurfaceData>();
+		double result;
+		temp->type = PLANAR;
 		MatrixXd A(vertices.size(), 3);
 		for (size_t i = 0; i < vertices.size(); i++)
 		{
@@ -37,31 +35,42 @@ namespace FeatureCategorisation {
 
 		}
 		Vector3d centroid = A.colwise().mean();
-		A.rowwise() -= centroid.transpose();
-		BDCSVD<MatrixXd> svd(A, ComputeThinU| ComputeThinV);
-		Vector3d normal = svd.matrixV().rightCols<1>();
-
-		if (!faces[0].IsNull())
+		if (vertices.size() == 3)
 		{
-			auto faceNormal = converter(faces[0]);
-			double dotProd = faceNormal.dot(normal);
-			normal *= (dotProd > 0) - (dotProd < 0); //sign(dotProduct);
+			temp->normal = converter(faces[0]);
+			result = 0;
+			temp->centroid = centroid;
 		}
-		//normal.normalize();
+		else
+		{
 
-		auto dist2 = (A*normal).cwiseAbs2();
-		
-		auto averageError = dist2.mean();
-		
-		auto temp = make_shared<PlanarSurfaceData>();
-		temp->normal = Vector3d(normal.x(), normal.y(), normal.z());
-		temp->type = PLANAR;
-		temp->centroid = centroid;
-		temp->normal2 = gp_Dir(normal.x(), normal.y(), normal.z());
-		temp->normal3 = Vector3d(temp->normal);
+			A.rowwise() -= centroid.transpose();
+			BDCSVD<MatrixXd> svd(A, ComputeThinU | ComputeThinV);
+			Vector3d normal = svd.matrixV().rightCols<1>();
 
+			if (!faces[0].IsNull())
+			{
+				auto faceNormal = converter(faces[0]);
+				double dotProd = faceNormal.dot(normal);
+
+				normal *= sgn(dotProd); //sign(dotProduct);
+			}
+			//normal.normalize();
+
+			auto dist2 = (A*normal).cwiseAbs2();
+
+			auto averageError = dist2.mean();
+
+			//auto temp = make_shared<PlanarSurfaceData>();
+			temp->normal = Vector3d(normal.x(), normal.y(), normal.z());
+			temp->type = PLANAR;
+			temp->centroid = centroid;
+
+			
+			result = averageError;
+		}
 		data = temp;
-		return averageError;
+		return result;
 	}
 
 	float SphericalCheck(const vector<TopoDS_Vertex> vertices, shared_ptr<SurfaceCategorisationData> &data, int numFaces, int numEdgeVerts)
@@ -86,9 +95,8 @@ namespace FeatureCategorisation {
 
 				V.row(i) = converter(vertices[i]);
 			}
-			cout << A << endl << endl << b << endl << ";" << endl << endl;
-			Vector4d x = A.jacobiSvd(ComputeThinU | ComputeThinV).solve(b);
-			cout << x << endl << endl << endl;
+
+			Vector4d x = A.bdcSvd(ComputeThinU | ComputeThinV).solve(b);
 			Vector3d centre(x(0), x(1), x(2));
 			double radius = sqrt(x(3) + x(0)*x(0) + x(1)*x(1) + x(2)*x(2));
 
@@ -159,23 +167,50 @@ namespace FeatureCategorisation {
 				Vector3d centroid = v.colwise().mean();
 				v.rowwise() -= centroid.transpose();
 				BDCSVD<MatrixXd> svd(v, ComputeThinU | ComputeThinV);
-				Vector3d axis = svd.matrixV().leftCols<1>();
-				Vector3d normal1 = svd.matrixV().rightCols<1>();
-				Vector3d normal2 = svd.matrixV().col(2);
-
-				TransformToCoordSpace(normal1, normal2, axis);
-
-				auto t = TransformToCoordSpace(normal1, normal2, axis);
+				Vector3d zDir = svd.matrixV().leftCols<1>();
+				Vector3d xDir = svd.matrixV().rightCols<1>();
+				Vector3d yDir = svd.matrixV().col(1);
+				
+				auto t = TransformToCoordSpace(xDir, yDir, zDir);
 
 				MatrixXd vt = v*t.transpose();
+				Vector3d scale = vt.colwise().maxCoeff() - vt.colwise().minCoeff();
+				MatrixXd scaled = vt.array().rowwise() / scale.transpose().array();
 
-				VectorXd distFromAxis = (vt.col(0).cwiseAbs2() + vt.col(1).cwiseAbs2()).cwiseSqrt();
-				VectorXd err2DistFromAxis = (distFromAxis.array() - distFromAxis.mean()).cwiseAbs2();
+				BDCSVD<MatrixXd> svd2(scaled, ComputeThinU | ComputeThinV);
+				zDir = svd2.matrixV().leftCols<1>();
+				xDir = svd2.matrixV().rightCols<1>();
+				yDir = svd2.matrixV().col(1);
+
+				
+
+				auto t2 = TransformToCoordSpace(xDir, yDir, zDir);
+				Vector3d axis = t.transpose()*zDir;
+				MatrixXd vt2 = vt*t2.transpose();
+
+				
+
+				VectorXd b = vt2.leftCols<2>().rowwise().squaredNorm();
+				MatrixXd A(vt2.rows(), 3);
+				A.col(0) = 2 * vt2.col(0);
+				A.col(1) = 2 * vt2.col(1);
+				A.col(2).array() = 1;
+				//b=Ax
+
+				Vector3d x = A.bdcSvd(ComputeThinU | ComputeThinV).solve(b);
+				Vector3d localCentre(x(0), x(1), 0);
+				Vector3d worldCentre = t.transpose()*t2.transpose()*localCentre + centroid;
+				double radius = sqrt(x(2) + x(1)*x(1) + x(0)*x(0));
+				
+
+				VectorXd distFromAxis = vt2.leftCols<2>().rowwise().norm();
+				
+				VectorXd err2DistFromAxis = (distFromAxis.array() - radius).cwiseAbs2();
 
 				auto temp = make_shared<CylindricalSurfaceData>();
 				temp->dir = axis;
-				temp->position = centroid;
-				temp->radius = HUGE_VAL;
+				temp->position = worldCentre;
+				temp->radius = radius;
 				temp->type = CYLINDRICAL;
 				temp->vMax = t.col(2).maxCoeff();
 				temp->vMin = t.col(2).minCoeff();
@@ -227,7 +262,7 @@ namespace FeatureCategorisation {
 		auto dist2 = V*axis;
 		auto t = TransformToCoordSpace(normal1, normal2, axis);
 		MatrixXd vt = V*t.transpose();
-		VectorXd dist2FromAxis = vt.col(0).cwiseAbs2() + vt.col(1).cwiseAbs2();
+		VectorXd dist2FromAxis = vt.leftCols<2>().rowwise().squaredNorm();
 
 		result = dist2FromAxis.mean();
 
@@ -252,8 +287,6 @@ namespace FeatureCategorisation {
 			TopoDS_Face face;
 			face.Nullify();
 
-			
-
 			Vector3d centroid = V.colwise().mean();
 
 			V.rowwise() -= centroid.transpose();
@@ -268,24 +301,39 @@ namespace FeatureCategorisation {
 
 			VectorXd b = vt.rowwise().squaredNorm();
 			MatrixXd A(V.rows(), 3);
-			A.col(0) = 2 * V.col(0);
-			A.col(1) = 2 * V.col(0);
+			A.col(0) = 2 * vt.col(0);
+			A.col(1) = 2 * vt.col(1);
 			A.col(2).array() = 1;
 			//b=Ax
-			Vector3d x = A.jacobiSvd(ComputeThinU | ComputeThinV).solve(b);
+			
+			Vector3d x = A.bdcSvd(ComputeThinU | ComputeThinV).solve(b);
 			Vector3d localCentre(x(0), x(1), 0);
-			double radius = sqrt(x(2) - x(1)*x(1) - x(0)*x(0));
+			double radius = sqrt(x(2) + x(1)*x(1) + x(0)*x(0));
 
 			auto averageRadialError2 = ((vt.rowwise() - localCentre.transpose()).rowwise().norm().array() - radius).cwiseAbs2().mean();
 			auto averageZError2 = vt.col(2).cwiseAbs2().mean();
 			auto averageError2 = averageZError2 + averageRadialError2;
 
 			Vector3d worldCentre = t.transpose()*localCentre + centroid; //Reverse transform to original vertex set
+
+			Vector3d point1 = vt.row(0);
+			Vector3d point2 = vt.row(1);
+			Vector3d point3 = vt.bottomRows<1>();
+
+			Vector3d radialDir = point1 - localCentre;
+			Vector3d localTangentialDir(radialDir.y(), -radialDir.x(), 0);
+			double dotProduct = localTangentialDir.dot(point2 - point1);
+			localTangentialDir *= Utilities::sgn(dotProduct);
+			Vector3d worldTangentialDir = t.transpose()*localTangentialDir;
+
 			result = averageError2;
 			auto temp = make_shared<CircularEdgeData>();
 			temp->position = worldCentre;
 			temp->normal = zDir;
 			temp->radius = radius;
+			temp->p1 = V.row(0) +centroid.transpose();
+			temp->p2 = V.bottomRows<1>()+centroid.transpose();
+			temp->tangent = worldTangentialDir;
 			temp->type = CIRCULAR;
 			//auto temp2 = make_shared<SurfaceCategorisationData>();
 			//result = SphericalCheck(edge, temp2, 0x7FFFFFFF);

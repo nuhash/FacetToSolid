@@ -49,7 +49,16 @@ namespace FeatureCategorisation
 		Vector3d position;
 		double radius;
 		Vector3d normal;
+		Vector3d p1;
+		Vector3d p2;
+		Vector3d tangent;
 	};
+	//struct ArcEdgeData : EdgeCategorisationData
+	//{
+	//	Vector3d p1;
+	//	Vector3d p2;
+	//	Vector3d tangent;
+	//};
 	struct PlanarSurfaceData :SurfaceCategorisationData
 	{
 		Vector3d normal;

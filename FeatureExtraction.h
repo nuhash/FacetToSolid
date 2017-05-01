@@ -301,7 +301,8 @@ namespace FeatureExtractionAlgo
 		{
 			this->back().AddEdgeVertex(vertex, type);
 		}
-
+		int NumVerts();
+		int NumEdgeVerts();
 	protected:
 	private:
 	};
