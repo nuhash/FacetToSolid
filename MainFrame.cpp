@@ -170,7 +170,7 @@ void MyFrame::Init()
 	auto featureExtSizer = new wxBoxSizer(wxVERTICAL);
 	auto methodSelSizer = new wxBoxSizer(wxHORIZONTAL);
 	wxArrayString str;
-	str.Add("Normal Tensor Framework Method");
+	//str.Add("Normal Tensor Framework Method");
 	str.Add("Hybrid Edgewise Normal Tensor Framework Method");
 	str.Add("Edgewise Method");
 	extMethodList = new wxChoice(featureExtPage, wxID_ANY,wxDefaultPosition,wxDefaultSize,str);
@@ -242,10 +242,7 @@ void MyFrame::OnExtractFeatures(wxCommandEvent& event)
 	auto t1 = Clock::now();
 	switch (currentSelection)
 	{
-	case 0: //Normal tensor framework method
-		features = FeatureExtractionAlgo::NormalTensorFrameworkMethod(occView->GetCurrentShape());
-		break;
-	case 1:
+	case 0:
 		features = FeatureExtractionAlgo::HybridEdgewiseNormalTensorFrameworkMethod(occView->GetCurrentShape());
 		break;
 	case 2:
